@@ -52,9 +52,11 @@ export async function parseEmployeeExcel(buffer: Buffer): Promise<{
     let lastName = "";
     if (nameCol !== -1) {
       const full = String(values[nameCol] ?? "").trim();
-      const parts = full.split(/\s+/);
+      const parts = full.split(/\s+/).filter(Boolean);
+      // Drop any middle name(s) — PDFs and the WhatsApp greeting both use
+      // just first + last, matching the emp_id-first_last.pdf convention.
       firstName = parts[0] ?? "";
-      lastName = parts.slice(1).join(" ");
+      lastName = parts.length > 1 ? parts[parts.length - 1] : "";
     } else {
       firstName = String(values[firstNameCol] ?? "").trim();
       lastName = String(values[lastNameCol] ?? "").trim();
