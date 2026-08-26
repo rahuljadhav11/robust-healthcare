@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileSpreadsheet, FolderOpen, ShieldCheck, CheckCircle2, AlertTriangle, Send } from "lucide-react";
+import { FileSpreadsheet, FolderOpen, ShieldCheck, CheckCircle2, AlertTriangle, Send, Search } from "lucide-react";
 import {
   matchEmployeesToPdfs,
   type MatchResult,
@@ -54,6 +54,7 @@ export default function NewBatchPage() {
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [excelBusy, setExcelBusy] = useState(false);
+  const [matchSearch, setMatchSearch] = useState("");
 
   useEffect(() => {
     dirInputRef.current?.setAttribute("webkitdirectory", "true");
@@ -96,6 +97,20 @@ export default function NewBatchPage() {
     setPdfFiles(files);
     if (files.length > 0) toast.success(`${files.length} PDFs found`);
   }
+
+  const filteredMatched = useMemo(() => {
+    if (!match) return [];
+    const q = matchSearch.trim().toLowerCase();
+    if (!q) return match.matched;
+    return match.matched.filter(
+      (m) =>
+        m.row.empId.toLowerCase().includes(q) ||
+        m.row.firstName.toLowerCase().includes(q) ||
+        m.row.lastName.toLowerCase().includes(q) ||
+        m.row.mobile.includes(q) ||
+        m.pdfFilename.toLowerCase().includes(q),
+    );
+  }, [match, matchSearch]);
 
   const matchedBytes =
     match?.matched.reduce((sum, m) => {
@@ -273,6 +288,57 @@ export default function NewBatchPage() {
                   <div className="text-xs text-muted-foreground">Invalid mobile number</div>
                 </div>
               </div>
+
+              {match.matched.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">Who will receive a report</p>
+                    <div className="relative w-56">
+                      <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={matchSearch}
+                        onChange={(e) => setMatchSearch(e.target.value)}
+                        placeholder="Search by name, ID, mobile…"
+                        className="h-8 pl-7 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto rounded-md border">
+                    <Table>
+                      <TableHeader className="sticky top-0 bg-card">
+                        <TableRow>
+                          <TableHead>Employee ID</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Mobile</TableHead>
+                          <TableHead>Matched PDF</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredMatched.map((m) => (
+                          <TableRow key={m.row.rowNumber}>
+                            <TableCell className="font-medium">{m.row.empId}</TableCell>
+                            <TableCell>
+                              {m.row.firstName} {m.row.lastName}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{m.row.mobile}</TableCell>
+                            <TableCell className="text-muted-foreground">{m.pdfFilename}</TableCell>
+                          </TableRow>
+                        ))}
+                        {filteredMatched.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">
+                              No matches for &quot;{matchSearch}&quot;
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Showing {filteredMatched.length} of {match.matched.length} employees who will receive a report.
+                  </p>
+                </div>
+              )}
 
               {overSizeLimit && (
                 <Alert variant="destructive">
