@@ -13,10 +13,17 @@ export async function POST(request: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const { rows, errors } = await parseEmployeeExcel(buffer);
-  if (errors.length > 0) {
-    return NextResponse.json({ error: errors.join("; ") }, { status: 400 });
-  }
 
-  return NextResponse.json({ rows });
+  try {
+    const { rows, errors } = await parseEmployeeExcel(buffer);
+    if (errors.length > 0) {
+      return NextResponse.json({ error: errors.join("; ") }, { status: 400 });
+    }
+    return NextResponse.json({ rows });
+  } catch (err) {
+    return NextResponse.json(
+      { error: `Couldn't read that file: ${err instanceof Error ? err.message : String(err)}` },
+      { status: 400 },
+    );
+  }
 }

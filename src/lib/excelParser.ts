@@ -10,7 +10,9 @@ const HEADER_ALIASES: Record<string, string[]> = {
 };
 
 function findColumn(headerRow: string[], aliases: string[]): number {
-  return headerRow.findIndex((h) => aliases.includes(h.trim().toLowerCase()));
+  // ExcelJS row.values is a sparse, 1-indexed array (hole at index 0).
+  // findIndex visits holes as undefined (unlike map/forEach), so guard here.
+  return headerRow.findIndex((h) => aliases.includes((h ?? "").trim().toLowerCase()));
 }
 
 export async function parseEmployeeExcel(buffer: Buffer): Promise<{
