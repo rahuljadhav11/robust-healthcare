@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -55,6 +56,7 @@ export default function NewBatchPage() {
   const [busy, setBusy] = useState(false);
   const [excelBusy, setExcelBusy] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     dirInputRef.current?.setAttribute("webkitdirectory", "true");
@@ -71,6 +73,14 @@ export default function NewBatchPage() {
     if (!rows || pdfFiles.length === 0) return null;
     return matchEmployeesToPdfs(rows, pdfFiles.map((f) => f.name));
   }, [rows, pdfFiles]);
+
+  // Every new match starts fully selected — admins deselect the ones to skip.
+  // Adjusted during render (not an effect) so there's no extra render pass.
+  const [matchForSelection, setMatchForSelection] = useState<MatchResult | null>(null);
+  if (match !== matchForSelection) {
+    setMatchForSelection(match);
+    setSelectedRows(new Set(match?.matched.map((m) => m.row.rowNumber) ?? []));
+  }
 
   async function handleExcelChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -112,15 +122,43 @@ export default function NewBatchPage() {
     );
   }, [match, matchSearch]);
 
-  const matchedBytes =
-    match?.matched.reduce((sum, m) => {
-      const f = pdfFiles.find((p) => p.name === m.pdfFilename);
-      return sum + (f?.size ?? 0);
-    }, 0) ?? 0;
+  const selectedMatched = useMemo(
+    () => match?.matched.filter((m) => selectedRows.has(m.row.rowNumber)) ?? [],
+    [match, selectedRows],
+  );
+
+  function toggleRow(rowNumber: number, checked: boolean) {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(rowNumber);
+      else next.delete(rowNumber);
+      return next;
+    });
+  }
+
+  function toggleFiltered(checked: boolean) {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      for (const m of filteredMatched) {
+        if (checked) next.add(m.row.rowNumber);
+        else next.delete(m.row.rowNumber);
+      }
+      return next;
+    });
+  }
+
+  const allFilteredSelected =
+    filteredMatched.length > 0 && filteredMatched.every((m) => selectedRows.has(m.row.rowNumber));
+  const someFilteredSelected = filteredMatched.some((m) => selectedRows.has(m.row.rowNumber));
+
+  const matchedBytes = selectedMatched.reduce((sum, m) => {
+    const f = pdfFiles.find((p) => p.name === m.pdfFilename);
+    return sum + (f?.size ?? 0);
+  }, 0);
   const overSizeLimit = matchedBytes > MAX_BATCH_BYTES;
 
   async function handleConfirm() {
-    if (!match || !clientId || !label.trim()) return;
+    if (!match || !clientId || !label.trim() || selectedMatched.length === 0) return;
     setBusy(true);
     try {
       const formData = new FormData();
@@ -131,7 +169,7 @@ export default function NewBatchPage() {
       formData.append(
         "matchedRows",
         JSON.stringify(
-          match.matched.map((m) => ({
+          selectedMatched.map((m) => ({
             empId: m.row.empId,
             firstName: m.row.firstName,
             lastName: m.row.lastName,
@@ -140,7 +178,7 @@ export default function NewBatchPage() {
           })),
         ),
       );
-      for (const m of match.matched) {
+      for (const m of selectedMatched) {
         const file = pdfFiles.find((p) => p.name === m.pdfFilename);
         if (file) formData.append("pdfs", file, file.name);
       }
@@ -272,8 +310,11 @@ export default function NewBatchPage() {
             <CardContent className="space-y-4 pl-[52px]">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-md border p-3">
-                  <div className="text-xl font-semibold text-emerald-600">{match.matched.length}</div>
-                  <div className="text-xs text-muted-foreground">Ready to send</div>
+                  <div className="text-xl font-semibold text-emerald-600">
+                    {selectedMatched.length}
+                    <span className="text-sm font-normal text-muted-foreground">/{match.matched.length}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">Selected to send</div>
                 </div>
                 <div className="rounded-md border p-3">
                   <div className="text-xl font-semibold text-amber-600">{match.unmatchedEmployees.length}</div>
@@ -307,6 +348,13 @@ export default function NewBatchPage() {
                     <Table>
                       <TableHeader className="sticky top-0 bg-card">
                         <TableRow>
+                          <TableHead className="w-8">
+                            <Checkbox
+                              checked={allFilteredSelected ? true : someFilteredSelected ? "indeterminate" : false}
+                              onCheckedChange={(checked) => toggleFiltered(checked === true)}
+                              aria-label="Select all"
+                            />
+                          </TableHead>
                           <TableHead>Employee ID</TableHead>
                           <TableHead>Name</TableHead>
                           <TableHead>Mobile</TableHead>
@@ -316,6 +364,13 @@ export default function NewBatchPage() {
                       <TableBody>
                         {filteredMatched.map((m) => (
                           <TableRow key={m.row.rowNumber}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedRows.has(m.row.rowNumber)}
+                                onCheckedChange={(checked) => toggleRow(m.row.rowNumber, checked === true)}
+                                aria-label={`Send to ${m.row.firstName} ${m.row.lastName}`}
+                              />
+                            </TableCell>
                             <TableCell className="font-medium">{m.row.empId}</TableCell>
                             <TableCell>
                               {m.row.firstName} {m.row.lastName}
@@ -326,7 +381,7 @@ export default function NewBatchPage() {
                         ))}
                         {filteredMatched.length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={4} className="text-center text-muted-foreground">
+                            <TableCell colSpan={5} className="text-center text-muted-foreground">
                               No matches for &quot;{matchSearch}&quot;
                             </TableCell>
                           </TableRow>
@@ -335,7 +390,8 @@ export default function NewBatchPage() {
                     </Table>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Showing {filteredMatched.length} of {match.matched.length} employees who will receive a report.
+                    {selectedMatched.length} of {match.matched.length} employees selected to receive a report
+                    {matchSearch && ` (showing ${filteredMatched.length} matching "${matchSearch}")`}.
                   </p>
                 </div>
               )}
@@ -409,11 +465,11 @@ export default function NewBatchPage() {
 
               <Button
                 onClick={handleConfirm}
-                disabled={busy || !clientId || !label.trim() || match.matched.length === 0 || overSizeLimit}
+                disabled={busy || !clientId || !label.trim() || selectedMatched.length === 0 || overSizeLimit}
                 size="lg"
               >
                 <Send />
-                {busy ? "Queueing…" : `Send to ${match.matched.length} employees`}
+                {busy ? "Queueing…" : `Send to ${selectedMatched.length} employees`}
               </Button>
             </CardContent>
           </Card>
