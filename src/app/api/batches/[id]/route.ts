@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getDb } from "@/db";
 import { batches, employees, messages } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { syncSentMessageStatuses } from "@/lib/statusSync";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/batches/[id]">) {
   const { userId } = await auth();
@@ -13,6 +14,10 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/batches/[id
 
   const [batch] = await db.select().from(batches).where(eq(batches.id, id));
   if (!batch) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Pulls real delivery/read status from MSG91's logs for anything still
+  // sitting at "sent" — a fallback for when MSG91's webhook isn't configured.
+  await syncSentMessageStatuses().catch(() => null);
 
   const rows = await db
     .select({

@@ -116,3 +116,27 @@ export async function sendDocumentTemplate({
 
   return { ok: true, msg91MessageId: messageId, raw };
 }
+
+const LOGS_ENDPOINT = "https://control.msg91.com/api/v5/report/logs/wa";
+
+export interface WhatsappLogEntry {
+  requestedAt: string;
+  status: string;
+  failureReason: string | null;
+  customerNumber: string;
+  uuid: string;
+}
+
+/** startDate/endDate as YYYY-MM-DD. MSG91 only allows a 3-day lookback window. */
+export async function fetchWhatsappLogs(startDate: string, endDate: string): Promise<WhatsappLogEntry[]> {
+  const authKey = process.env.MSG91_AUTH_KEY;
+  if (!authKey) throw new Msg91Error("Missing MSG91_AUTH_KEY env var", null);
+
+  const res = await fetch(`${LOGS_ENDPOINT}?startDate=${startDate}&endDate=${endDate}`, {
+    headers: { accept: "application/json", authkey: authKey },
+  });
+  if (!res.ok) return [];
+
+  const json = await res.json().catch(() => null);
+  return Array.isArray(json?.data) ? json.data : [];
+}
