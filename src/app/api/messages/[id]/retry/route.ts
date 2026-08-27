@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { requireAuthorizedUserId } from "@/lib/authz";
 import { retryMessage } from "@/lib/sendQueue";
 
 export async function POST(_request: Request, ctx: RouteContext<"/api/messages/[id]/retry">) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuthorizedUserId();
+  if (auth.response) return NextResponse.json({ error: auth.response.error }, { status: auth.response.status });
 
   const { id } = await ctx.params;
   const result = await retryMessage(id);

@@ -1,13 +1,33 @@
 import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import { UserButton } from "@clerk/nextjs";
+import { ShieldAlert } from "lucide-react";
+import { getAuthStatus } from "@/lib/authz";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  const status = await getAuthStatus();
+  if (status === "unauthenticated") redirect("/sign-in");
+
+  if (status === "unauthorized") {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/40 px-4">
+        <Card className="max-w-sm">
+          <CardHeader className="items-center text-center">
+            <ShieldAlert className="mb-2 size-8 text-destructive" />
+            <CardTitle>Access restricted</CardTitle>
+            <CardDescription>
+              This account isn&apos;t authorized to use Report Sender. Contact your administrator if you believe
+              this is a mistake.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+        <UserButton />
+      </div>
+    );
+  }
 
   return (
     <SidebarProvider>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { requireAuthorizedUserId } from "@/lib/authz";
 import { get } from "@vercel/blob";
 import { getDb } from "@/db";
 import { messages } from "@/db/schema";
@@ -9,8 +9,8 @@ import { eq } from "drizzle-orm";
 // permanent /api/reports/[token] link handed to MSG91/Meta. This one requires
 // a Clerk session and renders inline instead of forcing a download.
 export async function GET(_request: Request, ctx: RouteContext<"/api/messages/[id]/preview">) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuthorizedUserId();
+  if (auth.response) return NextResponse.json({ error: auth.response.error }, { status: auth.response.status });
 
   const { id } = await ctx.params;
   const db = getDb();

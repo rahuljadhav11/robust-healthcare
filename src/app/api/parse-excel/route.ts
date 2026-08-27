@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { requireAuthorizedUserId } from "@/lib/authz";
 import { parseEmployeeExcel } from "@/lib/excelParser";
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuthorizedUserId();
+  if (auth.response) return NextResponse.json({ error: auth.response.error }, { status: auth.response.status });
 
   const formData = await request.formData();
   const file = formData.get("file");

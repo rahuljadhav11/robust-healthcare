@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { requireAuthorizedUserId } from "@/lib/authz";
 import { put } from "@vercel/blob";
 import { getDb } from "@/db";
 import { batches, employees, messages } from "@/db/schema";
@@ -14,8 +14,9 @@ interface MatchedRowInput {
 }
 
 export async function POST(request: Request) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireAuthorizedUserId();
+  if (auth.response) return NextResponse.json({ error: auth.response.error }, { status: auth.response.status });
+  const userId = auth.userId;
 
   const formData = await request.formData();
   const clientId = formData.get("clientId");
