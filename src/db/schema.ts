@@ -65,13 +65,16 @@ export const webhookEvents = pgTable("webhook_events", {
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Short-lived, single-purpose download links handed to MSG91/Meta so they can
-// fetch the PDF over plain HTTPS without our app's auth. Never reused across sends.
+// Permanent, unguessable download links handed to MSG91/Meta so they can
+// fetch the PDF over plain HTTPS without our app's auth. Security comes from
+// the token being an unguessable 192-bit random value, not from expiry —
+// MSG91/Meta can fetch and retry fetching the document well after the
+// initial send (confirmed happening in production), so these must not
+// expire or be single-use, or the document silently never attaches.
 export const sendTokens = pgTable("send_tokens", {
   id: text("id").primaryKey(),
   messageId: text("message_id").notNull().references(() => messages.id, { onDelete: "cascade" }),
   token: text("token").notNull().unique(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   fetchCount: integer("fetch_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
