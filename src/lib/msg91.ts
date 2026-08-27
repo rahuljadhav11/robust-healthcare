@@ -9,15 +9,19 @@ export class Msg91Error extends Error {
 
 /**
  * Normalizes a raw mobile number to the digits-only, country-code-prefixed
- * form MSG91 expects (e.g. "919876543210"). Assumes India (91) when a bare
- * 10-digit number is given — override via DEFAULT_COUNTRY_CODE if a client
- * base is international.
+ * form MSG91 requires — e.g. "919876543210", never "+919876543210". Assumes
+ * India (91) when a bare 10-digit number is given — override via
+ * DEFAULT_COUNTRY_CODE if a client base is international.
  */
 export function normalizeMobile(raw: string): string {
+  // Strips everything but digits, so a leading '+' (or spaces/dashes) never
+  // reaches MSG91 — their API expects a bare country-code-prefixed number.
   const digits = raw.replace(/[^0-9]/g, "");
   const countryCode = process.env.DEFAULT_COUNTRY_CODE ?? "91";
+
   if (digits.length === 10) return `${countryCode}${digits}`;
   if (digits.length === 11 && digits.startsWith("0")) return `${countryCode}${digits.slice(1)}`;
+  if (digits.length === 12 && digits.startsWith(countryCode)) return digits;
   return digits;
 }
 

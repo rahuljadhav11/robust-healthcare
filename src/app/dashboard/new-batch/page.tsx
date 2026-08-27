@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileSpreadsheet, FolderOpen, ShieldCheck, CheckCircle2, AlertTriangle, Send, Search } from "lucide-react";
+import { FileSpreadsheet, FolderOpen, ShieldCheck, CheckCircle2, AlertTriangle, Send, Search, Eye } from "lucide-react";
 import {
   matchEmployeesToPdfs,
   type MatchResult,
@@ -46,7 +46,6 @@ function StepNumber({ n, done }: { n: number; done?: boolean }) {
 
 export default function NewBatchPage() {
   const router = useRouter();
-  const dirInputRef = useRef<HTMLInputElement>(null);
 
   const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
   const [clientId, setClientId] = useState("");
@@ -57,11 +56,6 @@ export default function NewBatchPage() {
   const [excelBusy, setExcelBusy] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-
-  useEffect(() => {
-    dirInputRef.current?.setAttribute("webkitdirectory", "true");
-    dirInputRef.current?.setAttribute("directory", "true");
-  }, []);
 
   useEffect(() => {
     fetch("/api/clients")
@@ -102,10 +96,19 @@ export default function NewBatchPage() {
     }
   }
 
-  function handlePdfFolderChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handlePdfFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []).filter((f) => f.name.toLowerCase().endsWith(".pdf"));
     setPdfFiles(files);
     if (files.length > 0) toast.success(`${files.length} PDFs found`);
+  }
+
+  // Files already sit in browser memory, so previewing costs nothing server-side.
+  function handlePreviewPdf(filename: string) {
+    const file = pdfFiles.find((p) => p.name === filename);
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    window.open(url, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
   const filteredMatched = useMemo(() => {
@@ -278,16 +281,16 @@ export default function NewBatchPage() {
             <div>
               <CardTitle>Upload the report PDFs</CardTitle>
               <CardDescription>
-                Select the whole folder — files should be named like{" "}
-                <code className="rounded bg-muted px-1 py-0.5 text-xs">1023-Asha_Patel.pdf</code>.
+                Open the folder in the file picker, then select all (Ctrl/Cmd+A) and open — files should be named
+                like <code className="rounded bg-muted px-1 py-0.5 text-xs">1023-Asha_Patel.pdf</code>.
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent className="pl-[52px]">
             <label className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-dashed px-4 py-3 text-sm hover:bg-muted">
               <FolderOpen className="size-4 text-muted-foreground" />
-              {pdfFiles.length > 0 ? "Choose a different folder" : "Choose PDF folder"}
-              <input ref={dirInputRef} type="file" onChange={handlePdfFolderChange} className="hidden" />
+              {pdfFiles.length > 0 ? "Choose different PDF files" : "Choose PDF files"}
+              <input type="file" accept=".pdf" multiple onChange={handlePdfFilesChange} className="hidden" />
             </label>
             {pdfFiles.length > 0 && (
               <p className="mt-2 text-sm text-muted-foreground">
@@ -359,6 +362,7 @@ export default function NewBatchPage() {
                           <TableHead>Name</TableHead>
                           <TableHead>Mobile</TableHead>
                           <TableHead>Matched PDF</TableHead>
+                          <TableHead className="w-8" />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -377,11 +381,23 @@ export default function NewBatchPage() {
                             </TableCell>
                             <TableCell className="text-muted-foreground">{m.row.mobile}</TableCell>
                             <TableCell className="text-muted-foreground">{m.pdfFilename}</TableCell>
+                            <TableCell>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="size-7"
+                                onClick={() => handlePreviewPdf(m.pdfFilename)}
+                                aria-label={`Preview ${m.pdfFilename}`}
+                              >
+                                <Eye className="size-3.5" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
                         ))}
                         {filteredMatched.length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            <TableCell colSpan={6} className="text-center text-muted-foreground">
                               No matches for &quot;{matchSearch}&quot;
                             </TableCell>
                           </TableRow>
