@@ -1,9 +1,8 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Send, PartyPopper } from "lucide-react";
+import { Send, PartyPopper, Eye, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -18,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { humanizeError } from "@/lib/errorMessages";
 
 interface MessageRow {
   id: string;
@@ -31,8 +31,8 @@ interface MessageRow {
   mobile: string;
 }
 
-interface BatchDetail {
-  batch: { id: string; label: string; totalMatched: number };
+interface SendDetail {
+  batch: { id: string; sequence: number; label: string | null; totalMatched: number };
   messages: MessageRow[];
   summary: Record<string, number>;
 }
@@ -46,25 +46,30 @@ const STATUS_BADGE: Record<string, { label: string; variant: "default" | "second
   failed: { label: "Failed", variant: "destructive" },
 };
 
-export default function BatchDetailPage({ params }: PageProps<"/dashboard/batches/[id]">) {
-  const { id } = use(params);
-  const [data, setData] = useState<BatchDetail | null>(null);
+export default function SendDetailPage({ params }: PageProps<"/dashboard/companies/[id]/sends/[sendId]">) {
+  const { sendId } = use(params);
+  const [data, setData] = useState<SendDetail | null>(null);
   const [sending, setSending] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
+
+  async function load() {
+    const res = await fetch(`/api/batches/${sendId}`);
+    if (res.ok) setData(await res.json());
+  }
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      const res = await fetch(`/api/batches/${id}`);
-      if (!res.ok || cancelled) return;
-      setData(await res.json());
+    async function tick() {
+      const res = await fetch(`/api/batches/${sendId}`);
+      if (!cancelled && res.ok) setData(await res.json());
     }
-    load();
-    const interval = setInterval(load, 5000);
+    tick();
+    const interval = setInterval(tick, 5000);
     return () => {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [id]);
+  }, [sendId]);
 
   async function handleSendNow() {
     setSending(true);
@@ -81,15 +86,31 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/batche
         const ok = result.results.filter((r: { ok: boolean }) => r.ok).length;
         toast.success(`Sent ${ok} of ${result.claimed} attempted`);
       }
+      load();
     } finally {
       setSending(false);
     }
   }
 
+  async function handleRetry(messageId: string) {
+    setRetrying(messageId);
+    try {
+      const res = await fetch(`/api/messages/${messageId}/retry`, { method: "POST" });
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error(result.error ?? "Couldn't retry this send");
+        return;
+      }
+      toast[result.ok ? "success" : "error"](result.ok ? "Sent successfully" : "Still failed — see the error below");
+      load();
+    } finally {
+      setRetrying(null);
+    }
+  }
+
   if (!data) {
     return (
-      <div className="mx-auto max-w-4xl px-6 py-8 space-y-4">
-        <Skeleton className="h-8 w-64" />
+      <div className="space-y-4">
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -104,22 +125,16 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/batche
   const allDone = pending === 0 && total > 0;
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8 space-y-6">
-      <div>
-        <Link
-          href="/dashboard"
-          className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" />
-          Overview
-        </Link>
-        <div className="flex items-start justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">{data.batch.label}</h1>
-          <Button onClick={handleSendNow} disabled={sending || pending === 0}>
-            <Send />
-            {sending ? "Sending…" : "Send now"}
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-start justify-between">
+        <h2 className="text-lg font-semibold">
+          Send #{data.batch.sequence}
+          {data.batch.label && <span className="font-normal text-muted-foreground"> — {data.batch.label}</span>}
+        </h2>
+        <Button onClick={handleSendNow} disabled={sending || pending === 0}>
+          <Send />
+          {sending ? "Sending…" : "Send now"}
+        </Button>
       </div>
 
       {allDone && failed === 0 && (
@@ -127,7 +142,7 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/batche
           <PartyPopper />
           <AlertTitle>All reports delivered</AlertTitle>
           <AlertDescription className="text-emerald-800">
-            Every employee in this batch has received their report.
+            Every employee in this send has received their report.
           </AlertDescription>
         </Alert>
       )}
@@ -169,7 +184,8 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/batche
                 <TableHead>Employee</TableHead>
                 <TableHead>Mobile</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Error</TableHead>
+                <TableHead>Reason (if failed)</TableHead>
+                <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -184,7 +200,29 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/batche
                     <TableCell>
                       <Badge variant={badge.variant}>{badge.label}</Badge>
                     </TableCell>
-                    <TableCell className="max-w-[240px] truncate text-xs text-destructive">{m.error ?? ""}</TableCell>
+                    <TableCell className="max-w-[240px] truncate text-xs text-destructive">
+                      {m.status === "failed" ? humanizeError(m.error) : ""}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="size-7" asChild>
+                          <a href={`/api/messages/${m.id}/preview`} target="_blank" rel="noopener noreferrer">
+                            <Eye className="size-3.5" />
+                          </a>
+                        </Button>
+                        {m.status === "failed" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7"
+                            disabled={retrying === m.id}
+                            onClick={() => handleRetry(m.id)}
+                          >
+                            <RotateCw className={`size-3.5 ${retrying === m.id ? "animate-spin" : ""}`} />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })}

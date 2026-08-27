@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { put } from "@vercel/blob";
 import { getDb } from "@/db";
 import { batches, employees, messages } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 interface MatchedRowInput {
   empId: string;
@@ -24,8 +24,8 @@ export async function POST(request: Request) {
   const unmatchedEmployeesCount = Number(formData.get("unmatchedEmployeesCount") ?? "0");
   const unmatchedPdfsCount = Number(formData.get("unmatchedPdfsCount") ?? "0");
 
-  if (typeof clientId !== "string" || typeof label !== "string" || typeof matchedRowsRaw !== "string") {
-    return NextResponse.json({ error: "Missing clientId, label, or matchedRows" }, { status: 400 });
+  if (typeof clientId !== "string" || typeof matchedRowsRaw !== "string") {
+    return NextResponse.json({ error: "Missing clientId or matchedRows" }, { status: 400 });
   }
 
   let matchedRows: MatchedRowInput[];
@@ -42,12 +42,19 @@ export async function POST(request: Request) {
   const pdfByName = new Map(pdfFiles.map((f) => [f.name, f]));
 
   const db = getDb();
+
+  const [{ maxSequence }] = await db
+    .select({ maxSequence: sql<number>`coalesce(max(${batches.sequence}), 0)` })
+    .from(batches)
+    .where(eq(batches.clientId, clientId));
+
   const [batch] = await db
     .insert(batches)
     .values({
       id: crypto.randomUUID(),
       clientId,
-      label,
+      sequence: Number(maxSequence) + 1,
+      label: typeof label === "string" && label.trim() ? label.trim() : null,
       createdBy: userId,
       totalMatched: matchedRows.length,
       unmatchedEmployees: unmatchedEmployeesCount,

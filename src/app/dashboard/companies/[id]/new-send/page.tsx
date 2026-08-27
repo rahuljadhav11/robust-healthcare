@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FileSpreadsheet, FolderOpen, ShieldCheck, CheckCircle2, AlertTriangle, Send, Search, Eye } from "lucide-react";
@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -26,11 +25,6 @@ import {
 } from "@/components/ui/table";
 
 const MAX_BATCH_BYTES = 80 * 1024 * 1024; // headroom under the 100MB function body limit
-
-interface ClientOption {
-  id: string;
-  name: string;
-}
 
 function StepNumber({ n, done }: { n: number; done?: boolean }) {
   return (
@@ -44,11 +38,10 @@ function StepNumber({ n, done }: { n: number; done?: boolean }) {
   );
 }
 
-export default function NewBatchPage() {
+export default function NewSendPage({ params }: PageProps<"/dashboard/companies/[id]/new-send">) {
+  const { id: clientId } = use(params);
   const router = useRouter();
 
-  const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
-  const [clientId, setClientId] = useState("");
   const [label, setLabel] = useState("");
   const [rows, setRows] = useState<ParsedEmployeeRow[] | null>(null);
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
@@ -56,12 +49,6 @@ export default function NewBatchPage() {
   const [excelBusy, setExcelBusy] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-
-  useEffect(() => {
-    fetch("/api/clients")
-      .then((r) => r.json())
-      .then((d) => setClientOptions(d.clients ?? []));
-  }, []);
 
   const match: MatchResult | null = useMemo(() => {
     if (!rows || pdfFiles.length === 0) return null;
@@ -161,12 +148,12 @@ export default function NewBatchPage() {
   const overSizeLimit = matchedBytes > MAX_BATCH_BYTES;
 
   async function handleConfirm() {
-    if (!match || !clientId || !label.trim() || selectedMatched.length === 0) return;
+    if (!match || selectedMatched.length === 0) return;
     setBusy(true);
     try {
       const formData = new FormData();
       formData.append("clientId", clientId);
-      formData.append("label", label.trim());
+      if (label.trim()) formData.append("label", label.trim());
       formData.append("unmatchedEmployeesCount", String(match.unmatchedEmployees.length));
       formData.append("unmatchedPdfsCount", String(match.unmatchedPdfs.length));
       formData.append(
@@ -189,85 +176,44 @@ export default function NewBatchPage() {
       const res = await fetch("/api/batches", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? "Couldn't queue this batch");
+        toast.error(data.error ?? "Couldn't queue this send");
         return;
       }
       toast.success("Reports queued for sending");
-      router.push(`/dashboard/batches/${data.batch.id}`);
+      router.push(`/dashboard/companies/${clientId}/sends/${data.batch.id}`);
     } finally {
       setBusy(false);
     }
   }
 
-  const step1Done = Boolean(clientId && label.trim());
-
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Send reports</h1>
-        <p className="text-sm text-muted-foreground">
-          Upload your employee list and report PDFs — we&apos;ll match each employee to their report automatically.
-        </p>
-      </div>
-
+    <div className="space-y-4">
       <div className="space-y-4">
         <Card>
           <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-            <StepNumber n={1} done={step1Done} />
-            <div>
-              <CardTitle>Which company are these reports for?</CardTitle>
-              <CardDescription>Reports are always sent for one company at a time.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2 pl-[52px]">
-            <div className="space-y-1.5">
-              <Label>Company</Label>
-              <Select value={clientId} onValueChange={setClientId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a company" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clientOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {clientOptions.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  No companies yet — add one from the Overview page first.
-                </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="batch-label">Batch name</Label>
-              <Input
-                id="batch-label"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="e.g. August health checkup"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-            <StepNumber n={2} done={Boolean(rows)} />
+            <StepNumber n={1} done={Boolean(rows)} />
             <div>
               <CardTitle>Upload your employee list</CardTitle>
               <CardDescription>An Excel file with columns for employee ID, name, and mobile number.</CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="pl-[52px]">
+          <CardContent className="space-y-4 pl-[52px]">
+            <div className="max-w-xs space-y-1.5">
+              <Label htmlFor="send-label">Name this send (optional)</Label>
+              <Input
+                id="send-label"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="e.g. August health checkup"
+              />
+            </div>
             <label className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-dashed px-4 py-3 text-sm hover:bg-muted">
               <FileSpreadsheet className="size-4 text-muted-foreground" />
               {excelBusy ? "Reading…" : rows ? "Choose a different file" : "Choose Excel file"}
               <input type="file" accept=".xlsx,.xls" onChange={handleExcelChange} className="hidden" />
             </label>
             {rows && (
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 <CheckCircle2 className="mr-1 inline size-3.5 text-emerald-600" />
                 {rows.length} employees found
               </p>
@@ -277,7 +223,7 @@ export default function NewBatchPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-            <StepNumber n={3} done={pdfFiles.length > 0} />
+            <StepNumber n={2} done={pdfFiles.length > 0} />
             <div>
               <CardTitle>Upload the report PDFs</CardTitle>
               <CardDescription>
@@ -304,7 +250,7 @@ export default function NewBatchPage() {
         {match && (
           <Card>
             <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-              <StepNumber n={4} />
+              <StepNumber n={3} />
               <div>
                 <CardTitle>Review before sending</CardTitle>
                 <CardDescription>Nothing is sent until you confirm below.</CardDescription>
@@ -415,10 +361,10 @@ export default function NewBatchPage() {
               {overSizeLimit && (
                 <Alert variant="destructive">
                   <AlertTriangle />
-                  <AlertTitle>This batch is too large</AlertTitle>
+                  <AlertTitle>This send is too large</AlertTitle>
                   <AlertDescription>
                     {(matchedBytes / 1024 / 1024).toFixed(0)}MB, over the {MAX_BATCH_BYTES / 1024 / 1024}MB limit per
-                    batch. Split this into smaller groups and send them as separate batches.
+                    send. Split this into smaller groups and send them separately.
                   </AlertDescription>
                 </Alert>
               )}
@@ -475,13 +421,12 @@ export default function NewBatchPage() {
 
               <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
                 <ShieldCheck className="size-4 shrink-0" />
-                Each report is sent as a private, expiring link — never a public URL. Only WhatsApp can fetch it, and
-                only for a few minutes.
+                Each report is sent as a private, unguessable link only WhatsApp can fetch — never a public URL.
               </div>
 
               <Button
                 onClick={handleConfirm}
-                disabled={busy || !clientId || !label.trim() || selectedMatched.length === 0 || overSizeLimit}
+                disabled={busy || selectedMatched.length === 0 || overSizeLimit}
                 size="lg"
               >
                 <Send />

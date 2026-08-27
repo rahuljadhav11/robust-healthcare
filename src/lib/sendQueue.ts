@@ -9,8 +9,8 @@ import { getAppUrl } from "@/lib/appUrl";
 // Total messages one invocation will attempt, capped further by whatever's
 // left of today's DAILY_SEND_LIMIT. Sent with modest concurrency so a full
 // day's quota fits comfortably inside a single function's time budget.
-const RUN_SIZE = 250;
-const CONCURRENCY = 5;
+const RUN_SIZE = 2000;
+const CONCURRENCY = 10;
 
 interface ClaimedMessage extends Record<string, unknown> {
   id: string;
@@ -102,4 +102,27 @@ export async function runSendQueue() {
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
 
   return { claimed: claimed.rows.length, results };
+}
+
+/** Re-attempts a single failed message right away, respecting today's remaining quota. */
+export async function retryMessage(messageId: string): Promise<{ ok: boolean; error?: string }> {
+  const db = getDb();
+  const dailyLimit = getDailyLimit();
+  const sentToday = await getSentTodayCount();
+  if (sentToday >= dailyLimit) {
+    return { ok: false, error: "Today's WhatsApp sending limit has been reached — this will need to wait until tomorrow." };
+  }
+
+  const claimed = await db.execute<ClaimedMessage>(sql`
+    UPDATE messages
+    SET status = 'sending', updated_at = now()
+    WHERE id = ${messageId} AND status = 'failed'
+    RETURNING id, employee_id, blob_pathname, original_filename
+  `);
+
+  const msg = claimed.rows[0];
+  if (!msg) return { ok: false, error: "This message isn't in a failed state, so it can't be retried right now." };
+
+  const result = await sendOne(db, msg);
+  return { ok: result.ok };
 }

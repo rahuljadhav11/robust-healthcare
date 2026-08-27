@@ -26,10 +26,15 @@ export const employees = pgTable(
   (table) => [unique("employees_client_emp_id_unique").on(table.clientId, table.empId)],
 );
 
+// A "send" (internally still named batches) — one upload-and-send round for
+// one company. `sequence` is a per-company auto-increment (Send #1, #2, ...)
+// so two sends never need a unique name; `label` is purely an optional,
+// non-unique description the admin can add for their own reference.
 export const batches = pgTable("batches", {
   id: text("id").primaryKey(),
   clientId: text("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
-  label: text("label").notNull(),
+  sequence: integer("sequence").notNull(),
+  label: text("label"),
   createdBy: text("created_by").notNull(),
   totalMatched: integer("total_matched").notNull().default(0),
   unmatchedEmployees: integer("unmatched_employees").notNull().default(0),

@@ -1,27 +1,38 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileHeart, LayoutDashboard, SendHorizonal } from "lucide-react";
+import { Building2, FileHeart, LayoutDashboard } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-const NAV_ITEMS = [
-  { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Send reports", url: "/dashboard/new-batch", icon: SendHorizonal },
-];
+interface ClientOption {
+  id: string;
+  name: string;
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const [companies, setCompanies] = useState<ClientOption[]>([]);
+
+  useEffect(() => {
+    // Refetch on every navigation (cheap — a short list) so a newly added
+    // company shows up without requiring a hard page refresh.
+    fetch("/api/clients")
+      .then((r) => r.json())
+      .then((d) => setCompanies(d.clients ?? []));
+  }, [pathname]);
 
   return (
     <Sidebar collapsible="icon">
@@ -46,19 +57,41 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={pathname === item.url} tooltip={item.title}>
-                    <Link href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === "/dashboard"} tooltip="Companies">
+                  <Link href="/dashboard">
+                    <LayoutDashboard />
+                    <span>Companies</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {companies.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Your companies</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {companies.map((c) => (
+                  <SidebarMenuItem key={c.id}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname.startsWith(`/dashboard/companies/${c.id}`)}
+                      tooltip={c.name}
+                    >
+                      <Link href={`/dashboard/companies/${c.id}`}>
+                        <Building2 />
+                        <span>{c.name}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter />
     </Sidebar>

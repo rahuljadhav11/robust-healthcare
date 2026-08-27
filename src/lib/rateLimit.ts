@@ -3,7 +3,7 @@ import { messages } from "@/db/schema";
 import { and, gte, inArray, sql } from "drizzle-orm";
 
 export function getDailyLimit(): number {
-  return Number(process.env.DAILY_SEND_LIMIT ?? "250");
+  return Number(process.env.DAILY_SEND_LIMIT ?? "2000");
 }
 
 /** Counts messages already sent (or in flight) today, across all clients/batches. */
