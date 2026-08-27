@@ -26,3 +26,10 @@ export async function consumeSendToken(token: string): Promise<{ messageId: stri
 
   return { messageId: row.messageId };
 }
+
+/** Same lookup as consumeSendToken but doesn't bump fetchCount — for HEAD probes. */
+export async function peekSendToken(token: string): Promise<{ messageId: string } | null> {
+  const db = getDb();
+  const [row] = await db.select().from(sendTokens).where(eq(sendTokens.token, token));
+  return row ? { messageId: row.messageId } : null;
+}
