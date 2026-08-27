@@ -108,5 +108,11 @@ export async function sendDocumentTemplate({
   const messageId =
     dataObj?.messageId ?? (raw as { message_id?: string })?.message_id ?? null;
 
+  if (!messageId) {
+    // Temporary: logs the full success payload so the field name can be
+    // corrected from a real response instead of guessed. Remove once fixed.
+    console.log("[msg91] success response missing a recognized message id:", JSON.stringify(raw));
+  }
+
   return { ok: true, msg91MessageId: messageId, raw };
 }
