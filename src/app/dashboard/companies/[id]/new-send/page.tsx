@@ -179,7 +179,14 @@ export default function NewSendPage({ params }: PageProps<"/dashboard/companies/
         toast.error(data.error ?? "Couldn't queue this send");
         return;
       }
-      toast.success("Reports queued for sending");
+      const sent = data.sendResult?.results?.filter((r: { ok: boolean }) => r.ok).length ?? 0;
+      if (data.sendResult?.reason === "daily limit reached") {
+        toast.info("Queued — today's WhatsApp sending limit was already reached, so this will start sending tomorrow.");
+      } else if (sent > 0) {
+        toast.success(`Sent ${sent} of ${data.queued} reports`);
+      } else {
+        toast.success("Reports queued for sending");
+      }
       router.push(`/dashboard/companies/${clientId}/sends/${data.batch.id}`);
     } finally {
       setBusy(false);
@@ -430,7 +437,7 @@ export default function NewSendPage({ params }: PageProps<"/dashboard/companies/
                 size="lg"
               >
                 <Send />
-                {busy ? "Queueing…" : `Send to ${selectedMatched.length} employees`}
+                {busy ? "Sending…" : `Send to ${selectedMatched.length} employees`}
               </Button>
             </CardContent>
           </Card>

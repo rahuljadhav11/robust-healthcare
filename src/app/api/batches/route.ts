@@ -4,6 +4,7 @@ import { put } from "@vercel/blob";
 import { getDb } from "@/db";
 import { batches, employees, messages } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { runSendQueue } from "@/lib/sendQueue";
 
 interface MatchedRowInput {
   empId: string;
@@ -110,5 +111,12 @@ export async function POST(request: Request) {
     queued++;
   }
 
-  return NextResponse.json({ batch, queued, skipped });
+  // Confirming in the wizard IS the human confirmation to send — no reason to
+  // make the admin click "Send now" again right after. This drains up to
+  // today's remaining quota immediately; anything left over (daily cap hit,
+  // or a very large send) still shows up as "pending" for "Send now" or the
+  // daily cron to pick up later.
+  const sendResult = await runSendQueue().catch(() => null);
+
+  return NextResponse.json({ batch, queued, skipped, sendResult });
 }
