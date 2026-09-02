@@ -177,7 +177,7 @@ export default function InboxPage() {
   let lastDay: string | null = null;
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-3.5rem)] max-w-6xl">
+    <div className="mx-auto flex h-[calc(100vh-3.5rem)] max-w-6xl border-x shadow-lg">
       <div className="flex w-80 shrink-0 flex-col border-r bg-card">
         <div className="border-b px-4 py-3">
           <h1 className="text-lg font-semibold">Inbox</h1>
@@ -254,24 +254,32 @@ export default function InboxPage() {
               <CompanyAvatar
                 name={thread?.identity ? identityName(thread.identity, selected) : selectedConversation ? conversationName(selectedConversation) : selected}
               />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <span className="truncate text-sm font-medium">
                     {thread?.identity ? identityName(thread.identity, selected) : selectedConversation ? conversationName(selectedConversation) : selected}
                   </span>
                   {thread?.identity?.firstName && <BadgeCheck className="size-3.5 shrink-0 text-chat" />}
-                </div>
-                <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                  <span>{selected}</span>
-                  {thread?.identity?.companyName && (
-                    <span className="flex items-center gap-1">
-                      <Building2 className="size-3" />
-                      {thread.identity.companyName}
+                  {thread && !thread.identity && (
+                    <span className="shrink-0 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                      Unmatched
                     </span>
                   )}
-                  {thread?.identity?.empId && <span>ID {thread.identity.empId}</span>}
-                  {thread && !thread.identity && (
-                    <span className="text-amber-600 dark:text-amber-400">Not matched to any employee record</span>
+                </div>
+                <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                  <span className="shrink-0">{selected}</span>
+                  {thread?.identity?.companyName && (
+                    <>
+                      <span className="shrink-0">·</span>
+                      <Building2 className="size-3 shrink-0" />
+                      <span className="truncate">{thread.identity.companyName}</span>
+                    </>
+                  )}
+                  {thread?.identity?.empId && (
+                    <>
+                      <span className="shrink-0">·</span>
+                      <span className="shrink-0">ID {thread.identity.empId}</span>
+                    </>
                   )}
                 </div>
               </div>
@@ -368,7 +376,7 @@ export default function InboxPage() {
                   className="hidden"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 />
-                <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()}>
+                <Button variant="outline" size="icon-lg" onClick={() => fileInputRef.current?.click()}>
                   <Paperclip className="size-4" />
                 </Button>
                 <Textarea
@@ -383,7 +391,12 @@ export default function InboxPage() {
                     }
                   }}
                 />
-                <Button onClick={handleSend} disabled={sending || (!draft.trim() && !file)} className="bg-chat text-chat-foreground hover:bg-chat/90">
+                <Button
+                  size="icon-lg"
+                  onClick={handleSend}
+                  disabled={sending || (!draft.trim() && !file)}
+                  className="bg-chat text-chat-foreground hover:bg-chat/90"
+                >
                   {sending ? <Loader2 className="animate-spin" /> : <Send />}
                 </Button>
               </div>

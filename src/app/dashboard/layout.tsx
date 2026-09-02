@@ -36,7 +36,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
         <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card/60 px-4 backdrop-blur-sm">
           <div className="flex items-center gap-2">
             <SidebarTrigger />
-            <Separator orientation="vertical" className="h-4" />
+            <Separator orientation="vertical" className="h-4 self-center!" />
           </div>
           <UserButton
             appearance={{
