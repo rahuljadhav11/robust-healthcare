@@ -38,7 +38,7 @@ function StepNumber({ n, done }: { n: number; done?: boolean }) {
   );
 }
 
-export default function NewSendPage({ params }: PageProps<"/dashboard/companies/[id]/new-send">) {
+export default function NewBatchPage({ params }: PageProps<"/dashboard/companies/[id]/new-batch">) {
   const { id: clientId } = use(params);
   const router = useRouter();
 
@@ -176,11 +176,11 @@ export default function NewSendPage({ params }: PageProps<"/dashboard/companies/
       const res = await fetch("/api/batches", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? "Couldn't queue this send");
+        toast.error(data.error ?? "Couldn't queue this batch");
         return;
       }
       toast.success(`${data.queued} employees queued — click "Send now" on the next page when you're ready.`);
-      router.push(`/dashboard/companies/${clientId}/sends/${data.batch.id}`);
+      router.push(`/dashboard/companies/${clientId}/batches/${data.batch.id}`);
     } finally {
       setBusy(false);
     }
@@ -199,9 +199,9 @@ export default function NewSendPage({ params }: PageProps<"/dashboard/companies/
           </CardHeader>
           <CardContent className="space-y-4 pl-[52px]">
             <div className="max-w-xs space-y-1.5">
-              <Label htmlFor="send-label">Name this send (optional)</Label>
+              <Label htmlFor="batch-label">Name this batch (optional)</Label>
               <Input
-                id="send-label"
+                id="batch-label"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 placeholder="e.g. August health checkup"
@@ -361,10 +361,10 @@ export default function NewSendPage({ params }: PageProps<"/dashboard/companies/
               {overSizeLimit && (
                 <Alert variant="destructive">
                   <AlertTriangle />
-                  <AlertTitle>This send is too large</AlertTitle>
+                  <AlertTitle>This batch is too large</AlertTitle>
                   <AlertDescription>
                     {(matchedBytes / 1024 / 1024).toFixed(0)}MB, over the {MAX_BATCH_BYTES / 1024 / 1024}MB limit per
-                    send. Split this into smaller groups and send them separately.
+                    batch. Split this into smaller groups and queue them as separate batches.
                   </AlertDescription>
                 </Alert>
               )}

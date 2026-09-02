@@ -14,7 +14,7 @@ export default async function CompaniesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Companies</h1>
           <p className="text-sm text-muted-foreground">
-            Each company&apos;s employees, sends, and delivery status are kept completely separate.
+            Each company&apos;s employees, batches, and delivery status are kept completely separate.
           </p>
         </div>
         <AddCompanySheet />

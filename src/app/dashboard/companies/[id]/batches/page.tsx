@@ -13,11 +13,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export default async function SendsPage({ params }: PageProps<"/dashboard/companies/[id]/sends">) {
+export default async function BatchesPage({ params }: PageProps<"/dashboard/companies/[id]/batches">) {
   const { id } = await params;
   const db = getDb();
 
-  const sends = await db
+  const batchRows = await db
     .select({
       id: batches.id,
       sequence: batches.sequence,
@@ -37,26 +37,26 @@ export default async function SendsPage({ params }: PageProps<"/dashboard/compan
   return (
     <Card>
       <CardContent className="pt-6">
-        {sends.length === 0 ? (
+        {batchRows.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            No sends yet — click &quot;New send&quot; to get started.
+            No batches yet — click &quot;New batch&quot; to get started.
           </p>
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Send</TableHead>
+                <TableHead>Batch</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Employees</TableHead>
                 <TableHead className="text-right">Progress</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sends.map((s) => (
+              {batchRows.map((s) => (
                 <TableRow key={s.id} className="cursor-pointer">
                   <TableCell className="font-medium">
-                    <Link href={`/dashboard/companies/${id}/sends/${s.id}`} className="hover:underline">
-                      Send #{s.sequence}
+                    <Link href={`/dashboard/companies/${id}/batches/${s.id}`} className="hover:underline">
+                      Batch #{s.sequence}
                       {s.label && <span className="font-normal text-muted-foreground"> — {s.label}</span>}
                     </Link>
                   </TableCell>

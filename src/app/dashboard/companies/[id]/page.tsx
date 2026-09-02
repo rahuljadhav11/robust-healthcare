@@ -13,7 +13,7 @@ export default async function CompanyOverviewPage({ params }: PageProps<"/dashbo
   const stats = await getCompanyStats(id);
   const db = getDb();
 
-  const recentSends = await db
+  const recentBatches = await db
     .select({
       id: batches.id,
       sequence: batches.sequence,
@@ -74,30 +74,30 @@ export default async function CompanyOverviewPage({ params }: PageProps<"/dashbo
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Recent sends</CardTitle>
+          <CardTitle>Recent batches</CardTitle>
           <Button variant="ghost" size="sm" asChild>
-            <Link href={`/dashboard/companies/${id}/sends`}>
+            <Link href={`/dashboard/companies/${id}/batches`}>
               View all
               <ArrowRight />
             </Link>
           </Button>
         </CardHeader>
         <CardContent>
-          {recentSends.length === 0 ? (
+          {recentBatches.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              No sends yet — click &quot;New send&quot; to get started.
+              No batches yet — click &quot;New batch&quot; to get started.
             </p>
           ) : (
             <div className="divide-y">
-              {recentSends.map((s) => (
+              {recentBatches.map((s) => (
                 <Link
                   key={s.id}
-                  href={`/dashboard/companies/${id}/sends/${s.id}`}
+                  href={`/dashboard/companies/${id}/batches/${s.id}`}
                   className="flex items-center justify-between py-3 hover:opacity-80"
                 >
                   <div>
                     <div className="text-sm font-medium">
-                      Send #{s.sequence}
+                      Batch #{s.sequence}
                       {s.label && <span className="font-normal text-muted-foreground"> — {s.label}</span>}
                     </div>
                     <div className="text-xs text-muted-foreground">{s.totalMatched} employees</div>

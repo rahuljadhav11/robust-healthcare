@@ -31,7 +31,7 @@ interface MessageRow {
   mobile: string;
 }
 
-interface SendDetail {
+interface BatchDetail {
   batch: { id: string; sequence: number; label: string | null; totalMatched: number };
   messages: MessageRow[];
   summary: Record<string, number>;
@@ -46,21 +46,21 @@ const STATUS_BADGE: Record<string, { label: string; variant: "default" | "second
   failed: { label: "Failed", variant: "destructive" },
 };
 
-export default function SendDetailPage({ params }: PageProps<"/dashboard/companies/[id]/sends/[sendId]">) {
-  const { sendId } = use(params);
-  const [data, setData] = useState<SendDetail | null>(null);
+export default function BatchDetailPage({ params }: PageProps<"/dashboard/companies/[id]/batches/[batchId]">) {
+  const { batchId } = use(params);
+  const [data, setData] = useState<BatchDetail | null>(null);
   const [sending, setSending] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch(`/api/batches/${sendId}`);
+    const res = await fetch(`/api/batches/${batchId}`);
     if (res.ok) setData(await res.json());
   }
 
   useEffect(() => {
     let cancelled = false;
     async function tick() {
-      const res = await fetch(`/api/batches/${sendId}`);
+      const res = await fetch(`/api/batches/${batchId}`);
       if (!cancelled && res.ok) setData(await res.json());
     }
     tick();
@@ -69,7 +69,7 @@ export default function SendDetailPage({ params }: PageProps<"/dashboard/compani
       cancelled = true;
       clearInterval(interval);
     };
-  }, [sendId]);
+  }, [batchId]);
 
   async function handleSendNow() {
     setSending(true);
@@ -98,7 +98,7 @@ export default function SendDetailPage({ params }: PageProps<"/dashboard/compani
       const res = await fetch(`/api/messages/${messageId}/retry`, { method: "POST" });
       const result = await res.json();
       if (!res.ok) {
-        toast.error(result.error ?? "Couldn't retry this send");
+        toast.error(result.error ?? "Couldn't retry this message");
         return;
       }
       toast[result.ok ? "success" : "error"](result.ok ? "Sent successfully" : "Still failed — see the error below");
@@ -129,7 +129,7 @@ export default function SendDetailPage({ params }: PageProps<"/dashboard/compani
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <h2 className="text-lg font-semibold">
-          Send #{data.batch.sequence}
+          Batch #{data.batch.sequence}
           {data.batch.label && <span className="font-normal text-muted-foreground"> — {data.batch.label}</span>}
         </h2>
         <Button onClick={handleSendNow} disabled={sending || pending === 0} size={notStartedYet ? "lg" : "default"}>
@@ -154,7 +154,7 @@ export default function SendDetailPage({ params }: PageProps<"/dashboard/compani
           <PartyPopper />
           <AlertTitle>All reports delivered</AlertTitle>
           <AlertDescription className="text-emerald-800">
-            Every employee in this send has received their report.
+            Every employee in this batch has received their report.
           </AlertDescription>
         </Alert>
       )}

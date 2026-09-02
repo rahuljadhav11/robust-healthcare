@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Building2, ChevronLeft, SendHorizonal } from "lucide-react";
+import { Building2, ChevronLeft, ListPlus } from "lucide-react";
 import { getDb } from "@/db";
 import { clients } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -29,9 +29,9 @@ export default async function CompanyLayout({ children, params }: LayoutProps<"/
             {company.name}
           </h1>
           <Button asChild>
-            <Link href={`/dashboard/companies/${id}/new-send`}>
-              <SendHorizonal />
-              New send
+            <Link href={`/dashboard/companies/${id}/new-batch`}>
+              <ListPlus />
+              New batch
             </Link>
           </Button>
         </div>

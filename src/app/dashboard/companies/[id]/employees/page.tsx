@@ -71,7 +71,7 @@ export default function EmployeesPage({ params }: PageProps<"/dashboard/companie
       const res = await fetch(`/api/messages/${messageId}/retry`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? "Couldn't retry this send");
+        toast.error(data.error ?? "Couldn't retry this message");
         return;
       }
       if (data.ok) toast.success("Sent successfully");

@@ -11,7 +11,7 @@ export function CompanyTabs({ companyId }: { companyId: string }) {
   const tabs = [
     { href: base, label: "Overview", exact: true },
     { href: `${base}/employees`, label: "Employees" },
-    { href: `${base}/sends`, label: "Sends" },
+    { href: `${base}/batches`, label: "Batches" },
   ];
 
   return (
