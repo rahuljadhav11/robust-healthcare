@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { chatMessages } from "@/db/schema";
 import { matchEmployeeByPhone } from "@/lib/matchInbound";
@@ -7,6 +8,11 @@ import { matchEmployeeByPhone } from "@/lib/matchInbound";
 // customerNumber, customerName, contentType, text, url (media), filename,
 // caption, uuid, ts. There's no pull API for inbound messages — this
 // webhook is the only way to ever see what an employee sent back.
+//
+// MSG91 has two inbound event types ("Request Received" and "Report
+// Received") that can both fire for the same message with the same uuid —
+// we recommend enabling both (belt and suspenders against missing one), so
+// this dedupes on uuid to avoid showing the same reply twice.
 export async function POST(request: Request) {
   const raw = await request.text();
   const db = getDb();
@@ -16,6 +22,12 @@ export async function POST(request: Request) {
     const customerNumber: string | undefined = payload?.customerNumber;
     if (!customerNumber) {
       return NextResponse.json({ ok: true }); // nothing usable to store
+    }
+
+    const uuid: string | undefined = payload?.uuid;
+    if (uuid) {
+      const [existing] = await db.select({ id: chatMessages.id }).from(chatMessages).where(eq(chatMessages.msg91MessageId, uuid));
+      if (existing) return NextResponse.json({ ok: true, duplicate: true });
     }
 
     const match = await matchEmployeeByPhone(customerNumber);
