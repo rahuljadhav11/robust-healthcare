@@ -117,6 +117,109 @@ export async function sendDocumentTemplate({
   return { ok: true, msg91MessageId: messageId, raw };
 }
 
+const SESSION_MESSAGE_ENDPOINT = "https://control.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/";
+
+interface SendSessionMessageArgs {
+  to: string;
+  text?: string;
+  attachmentUrl?: string;
+  filename?: string;
+  contentType: "text" | "image" | "video" | "document";
+}
+
+/**
+ * Sends a free-form (non-template) message — only valid within WhatsApp's
+ * 24-hour session window after the customer last messaged in. This is the
+ * Inbox's reply path, distinct from sendDocumentTemplate's broadcast sends.
+ *
+ * The document content_type payload shape is extrapolated from MSG91's
+ * documented image/video shape ({content_type, attachment_url, caption}) —
+ * their docs don't show a document example explicitly. Logs the raw
+ * response so this can be corrected from a real reply once one is sent.
+ */
+export async function sendSessionMessage({
+  to,
+  text,
+  attachmentUrl,
+  filename,
+  contentType,
+}: SendSessionMessageArgs): Promise<Msg91SendResult> {
+  const authKey = process.env.MSG91_AUTH_KEY;
+  const integratedNumber = process.env.MSG91_INTEGRATED_NUMBER;
+  if (!authKey || !integratedNumber) {
+    throw new Msg91Error("Missing MSG91_AUTH_KEY or MSG91_INTEGRATED_NUMBER env vars", null);
+  }
+
+  const body: Record<string, unknown> = {
+    integrated_number: integratedNumber,
+    recipient_number: to,
+    content_type: contentType,
+  };
+  if (contentType === "text") {
+    body.text = text;
+  } else {
+    body.attachment_url = attachmentUrl;
+    if (filename) body.filename = filename;
+    if (text) body.caption = text;
+  }
+
+  const res = await fetch(SESSION_MESSAGE_ENDPOINT, {
+    method: "POST",
+    headers: { accept: "application/json", authkey: authKey, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const raw = await res.json().catch(() => null);
+  if (!res.ok) return { ok: false, msg91MessageId: null, raw };
+
+  const messageId =
+    (raw as { data?: { messageId?: string } })?.data?.messageId ??
+    (raw as { message_id?: string })?.message_id ??
+    null;
+  if (!messageId) {
+    console.log("[msg91] session message response missing a recognized message id:", JSON.stringify(raw));
+  }
+
+  return { ok: true, msg91MessageId: messageId, raw };
+}
+
+export interface WhatsappAnalyticsDay {
+  date: string;
+  total: number;
+  sent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+  utility: number;
+  marketing: number;
+  authentication: number;
+  replyCount: number;
+  avgDeliveryTime: number | null;
+  totalCredit: number;
+}
+
+export interface WhatsappAnalytics {
+  days: WhatsappAnalyticsDay[];
+  totals: WhatsappAnalyticsDay & { totalCount: number };
+}
+
+const ANALYTICS_ENDPOINT = "https://control.msg91.com/api/v5/report/analytics/p/wa/";
+
+/** startDate/endDate as YYYY-MM-DD. MSG91 caps the range at 31 days. */
+export async function fetchWhatsappAnalytics(startDate: string, endDate: string): Promise<WhatsappAnalytics | null> {
+  const authKey = process.env.MSG91_AUTH_KEY;
+  if (!authKey) throw new Msg91Error("Missing MSG91_AUTH_KEY env var", null);
+
+  const res = await fetch(`${ANALYTICS_ENDPOINT}?startDate=${startDate}&endDate=${endDate}`, {
+    headers: { accept: "application/json", authkey: authKey },
+  });
+  if (!res.ok) return null;
+
+  const json = await res.json().catch(() => null);
+  if (!json?.data) return null;
+  return { days: json.data, totals: json.total };
+}
+
 const LOGS_ENDPOINT = "https://control.msg91.com/api/v5/report/logs/wa";
 
 export interface WhatsappLogEntry {

@@ -1,6 +1,6 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { employees, messages } from "@/db/schema";
+import { employees, messages, syncState } from "@/db/schema";
 import { fetchWhatsappLogs, normalizeMobile, type WhatsappLogEntry } from "./msg91";
 
 const STATUS_MAP: Record<string, string> = {
@@ -11,6 +11,29 @@ const STATUS_MAP: Record<string, string> = {
 };
 
 const CLOCK_SKEW_TOLERANCE_MS = 5_000;
+const SYNC_COOLDOWN_SECONDS = 20;
+
+/**
+ * Claims the right to actually hit MSG91's API right now — at most once per
+ * cooldown window, no matter how many requests ask concurrently. Dashboard
+ * pages poll our own DB every few seconds; that's fast and free, but it used
+ * to also re-trigger this slow external call on every single poll, which is
+ * what made the app feel sluggish. Everyone else just reads whatever the last
+ * successful sync left behind.
+ */
+async function claimSyncSlot(): Promise<boolean> {
+  const db = getDb();
+  await db.insert(syncState).values({ id: "global", lastSyncedAt: null }).onConflictDoNothing();
+
+  const claimed = await db.execute(sql`
+    UPDATE sync_state
+    SET last_synced_at = now()
+    WHERE id = 'global'
+      AND (last_synced_at IS NULL OR last_synced_at < now() - make_interval(secs => ${SYNC_COOLDOWN_SECONDS}))
+    RETURNING id
+  `);
+  return claimed.rows.length > 0;
+}
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -43,7 +66,9 @@ interface PendingMessage {
  * (row N <-> message N) breaks under exactly this case, which is why this
  * matches per-window instead.
  */
-export async function syncSentMessageStatuses(): Promise<{ synced: number }> {
+export async function syncSentMessageStatuses(): Promise<{ synced: number; throttled?: boolean }> {
+  if (!(await claimSyncSlot())) return { synced: 0, throttled: true };
+
   const db = getDb();
 
   const pending: PendingMessage[] = await db

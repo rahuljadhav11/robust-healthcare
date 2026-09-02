@@ -70,6 +70,40 @@ export const webhookEvents = pgTable("webhook_events", {
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// A WhatsApp-like conversation timeline per phone number — both what an
+// employee sends us (inbound, webhook-only — there's no pull API for this)
+// and what an admin replies with from the Inbox (outbound, free-form within
+// WhatsApp's 24h session window, not a template send). Matched to an
+// employee/company by normalized phone number when possible; unmatched
+// senders still show up so nothing is silently dropped.
+export const chatMessages = pgTable("chat_messages", {
+  id: text("id").primaryKey(),
+  employeeId: text("employee_id").references(() => employees.id, { onDelete: "set null" }),
+  clientId: text("client_id").references(() => clients.id, { onDelete: "set null" }),
+  counterpartyNumber: text("counterparty_number").notNull(),
+  direction: text("direction").notNull(), // 'inbound' | 'outbound'
+  messageType: text("message_type").notNull().default("text"), // text | image | document | audio | video | location | unknown
+  textBody: text("text_body"),
+  mediaUrl: text("media_url"),
+  mediaFilename: text("media_filename"),
+  // Permanent, unguessable token for outbound attachments only — the public
+  // URL MSG91/Meta fetches to deliver a reply attachment, same security
+  // model as sendTokens (unguessable token, not expiry, is the boundary).
+  attachmentToken: text("attachment_token").unique(),
+  msg91MessageId: text("msg91_message_id"),
+  status: text("status").notNull().default("received"), // received | sent | delivered | read | failed
+  error: text("error"),
+  rawPayload: text("raw_payload"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Single-row throttle so the (slow, external) MSG91 log sync doesn't run on
+// every 5-second dashboard poll — only after enough time has passed.
+export const syncState = pgTable("sync_state", {
+  id: text("id").primaryKey(),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+});
+
 // Permanent, unguessable download links handed to MSG91/Meta so they can
 // fetch the PDF over plain HTTPS without our app's auth. Security comes from
 // the token being an unguessable 192-bit random value, not from expiry —

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, FileHeart, LayoutDashboard } from "lucide-react";
+import { AlertCircle, BarChart3, Building2, FileHeart, LayoutDashboard, MessageCircle } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +13,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
@@ -22,9 +23,17 @@ interface ClientOption {
   name: string;
 }
 
+const NAV_ITEMS = [
+  { href: "/dashboard", label: "Companies", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/inbox", label: "Inbox", icon: MessageCircle },
+  { href: "/dashboard/failed", label: "Failed", icon: AlertCircle },
+  { href: "/dashboard/insights", label: "Insights", icon: BarChart3 },
+];
+
 export function AppSidebar() {
   const pathname = usePathname();
   const [companies, setCompanies] = useState<ClientOption[]>([]);
+  const [failedCount, setFailedCount] = useState(0);
 
   useEffect(() => {
     // Refetch on every navigation (cheap — a short list) so a newly added
@@ -32,6 +41,9 @@ export function AppSidebar() {
     fetch("/api/clients")
       .then((r) => r.json())
       .then((d) => setCompanies(d.clients ?? []));
+    fetch("/api/failed")
+      .then((r) => r.json())
+      .then((d) => setFailedCount(d.failed?.length ?? 0));
   }, [pathname]);
 
   return (
@@ -57,14 +69,24 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === "/dashboard"} tooltip="Companies">
-                  <Link href="/dashboard">
-                    <LayoutDashboard />
-                    <span>Companies</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {NAV_ITEMS.map((item) => {
+                const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    {item.href === "/dashboard/failed" && failedCount > 0 && (
+                      <SidebarMenuBadge className="bg-destructive text-destructive-foreground">
+                        {failedCount}
+                      </SidebarMenuBadge>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
