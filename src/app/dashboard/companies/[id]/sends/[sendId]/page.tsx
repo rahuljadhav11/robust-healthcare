@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Send, PartyPopper, Eye, RotateCw } from "lucide-react";
+import { Send, PartyPopper, Eye, RotateCw, MousePointerClick } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -123,6 +123,7 @@ export default function SendDetailPage({ params }: PageProps<"/dashboard/compani
   const pending = (data.summary.pending ?? 0) + (data.summary.sending ?? 0);
   const progressPct = total > 0 ? Math.round(((done + failed) / total) * 100) : 0;
   const allDone = pending === 0 && total > 0;
+  const notStartedYet = total > 0 && pending === total;
 
   return (
     <div className="space-y-6">
@@ -131,11 +132,22 @@ export default function SendDetailPage({ params }: PageProps<"/dashboard/compani
           Send #{data.batch.sequence}
           {data.batch.label && <span className="font-normal text-muted-foreground"> — {data.batch.label}</span>}
         </h2>
-        <Button onClick={handleSendNow} disabled={sending || pending === 0}>
+        <Button onClick={handleSendNow} disabled={sending || pending === 0} size={notStartedYet ? "lg" : "default"}>
           <Send />
           {sending ? "Sending…" : "Send now"}
         </Button>
       </div>
+
+      {notStartedYet && (
+        <Alert className="border-primary/30 bg-primary/5">
+          <MousePointerClick />
+          <AlertTitle>Ready to send</AlertTitle>
+          <AlertDescription>
+            {total} employee{total === 1 ? "" : "s"} queued and waiting. Nothing has been sent yet — click{" "}
+            <strong>Send now</strong> above when you&apos;re ready to notify them.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {allDone && failed === 0 && (
         <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-600">

@@ -3,7 +3,7 @@
 import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileSpreadsheet, FolderOpen, ShieldCheck, CheckCircle2, AlertTriangle, Send, Search, Eye } from "lucide-react";
+import { FileSpreadsheet, FolderOpen, ShieldCheck, CheckCircle2, AlertTriangle, ListPlus, Search, Eye } from "lucide-react";
 import {
   matchEmployeesToPdfs,
   type MatchResult,
@@ -179,14 +179,7 @@ export default function NewSendPage({ params }: PageProps<"/dashboard/companies/
         toast.error(data.error ?? "Couldn't queue this send");
         return;
       }
-      const sent = data.sendResult?.results?.filter((r: { ok: boolean }) => r.ok).length ?? 0;
-      if (data.sendResult?.reason === "daily limit reached") {
-        toast.info("Queued — today's WhatsApp sending limit was already reached, so this will start sending tomorrow.");
-      } else if (sent > 0) {
-        toast.success(`Sent ${sent} of ${data.queued} reports`);
-      } else {
-        toast.success("Reports queued for sending");
-      }
+      toast.success(`${data.queued} employees queued — click "Send now" on the next page when you're ready.`);
       router.push(`/dashboard/companies/${clientId}/sends/${data.batch.id}`);
     } finally {
       setBusy(false);
@@ -431,14 +424,20 @@ export default function NewSendPage({ params }: PageProps<"/dashboard/companies/
                 Each report is sent as a private, unguessable link only WhatsApp can fetch — never a public URL.
               </div>
 
-              <Button
-                onClick={handleConfirm}
-                disabled={busy || selectedMatched.length === 0 || overSizeLimit}
-                size="lg"
-              >
-                <Send />
-                {busy ? "Sending…" : `Send to ${selectedMatched.length} employees`}
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  onClick={handleConfirm}
+                  disabled={busy || selectedMatched.length === 0 || overSizeLimit}
+                  size="lg"
+                >
+                  <ListPlus />
+                  {busy ? "Queueing…" : `Queue ${selectedMatched.length} employees`}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  This adds them to the send queue — you&apos;ll click a separate &quot;Send now&quot; button on the
+                  next page whenever you&apos;re ready to actually notify them.
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
