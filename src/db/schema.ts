@@ -90,6 +90,11 @@ export const chatMessages = pgTable("chat_messages", {
   // URL MSG91/Meta fetches to deliver a reply attachment, same security
   // model as sendTokens (unguessable token, not expiry, is the boundary).
   attachmentToken: text("attachment_token").unique(),
+  // Also has a partial unique index in the DB (WHERE msg91_message_id IS NOT
+  // NULL) — created via raw SQL, not tracked here, so `db:push` doesn't try
+  // to drop it. It's what makes the inbound webhook's dedupe insert atomic;
+  // see api/webhooks/msg91/inbound for why a plain unique() isn't used
+  // (multiple NULLs must stay allowed for outbound rows without an id yet).
   msg91MessageId: text("msg91_message_id"),
   status: text("status").notNull().default("received"), // received | sent | delivered | read | failed
   error: text("error"),
