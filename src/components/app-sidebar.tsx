@@ -34,6 +34,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const [companies, setCompanies] = useState<ClientOption[]>([]);
   const [failedCount, setFailedCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     // Refetch on every navigation (cheap — a short list) so a newly added
@@ -45,6 +46,32 @@ export function AppSidebar() {
       .then((r) => r.json())
       .then((d) => setFailedCount(d.failed?.length ?? 0));
   }, [pathname]);
+
+  useEffect(() => {
+    let cancelled = false;
+    function poll() {
+      fetch("/api/inbox")
+        .then((r) => r.json())
+        .then((d) => {
+          if (cancelled) return;
+          const total = (d.conversations ?? []).reduce(
+            (sum: number, c: { unread_count?: string | number }) => sum + Number(c.unread_count ?? 0),
+            0,
+          );
+          setUnreadCount(total);
+          if (typeof document !== "undefined") {
+            document.title = total > 0 ? `(${total}) Report Sender` : "Report Sender";
+          }
+        })
+        .catch(() => null);
+    }
+    poll();
+    const interval = setInterval(poll, 6000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <Sidebar collapsible="icon">
@@ -83,6 +110,9 @@ export function AppSidebar() {
                       <SidebarMenuBadge className="bg-destructive text-destructive-foreground">
                         {failedCount}
                       </SidebarMenuBadge>
+                    )}
+                    {item.href === "/dashboard/inbox" && unreadCount > 0 && (
+                      <SidebarMenuBadge className="bg-chat text-chat-foreground">{unreadCount}</SidebarMenuBadge>
                     )}
                   </SidebarMenuItem>
                 );

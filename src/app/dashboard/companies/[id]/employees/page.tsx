@@ -4,7 +4,6 @@ import { use, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Eye, RotateCw, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -17,15 +16,7 @@ import {
 } from "@/components/ui/table";
 import { humanizeError } from "@/lib/errorMessages";
 import type { EmployeeWithLatestStatus } from "@/lib/employeeStatus";
-
-const STATUS_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  pending: { label: "Pending", variant: "outline" },
-  sending: { label: "Sending", variant: "secondary" },
-  sent: { label: "Sent", variant: "default" },
-  delivered: { label: "Delivered", variant: "default" },
-  read: { label: "Read", variant: "default" },
-  failed: { label: "Failed", variant: "destructive" },
-};
+import { StatusBadge } from "@/components/status-badge";
 
 export default function EmployeesPage({ params }: PageProps<"/dashboard/companies/[id]/employees">) {
   const { id } = use(params);
@@ -103,7 +94,7 @@ export default function EmployeesPage({ params }: PageProps<"/dashboard/companie
         />
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-xl border bg-card shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -117,7 +108,6 @@ export default function EmployeesPage({ params }: PageProps<"/dashboard/companie
           </TableHeader>
           <TableBody>
             {filtered.map((e) => {
-              const badge = e.status ? STATUS_BADGE[e.status] ?? { label: e.status, variant: "outline" as const } : null;
               return (
                 <TableRow key={e.id}>
                   <TableCell className="font-medium">{e.emp_id}</TableCell>
@@ -126,7 +116,7 @@ export default function EmployeesPage({ params }: PageProps<"/dashboard/companie
                   </TableCell>
                   <TableCell className="text-muted-foreground">{e.mobile}</TableCell>
                   <TableCell>
-                    {badge ? <Badge variant={badge.variant}>{badge.label}</Badge> : <span className="text-muted-foreground text-xs">Never sent</span>}
+                    {e.status ? <StatusBadge status={e.status} /> : <span className="text-muted-foreground text-xs">Never sent</span>}
                   </TableCell>
                   <TableCell className="max-w-[280px] truncate text-xs text-destructive">
                     {e.status === "failed" ? humanizeError(e.error) : ""}

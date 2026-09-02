@@ -104,7 +104,7 @@ export default function FailedPage() {
       {failed === null ? (
         <Skeleton className="h-96 w-full" />
       ) : (
-        <Card>
+        <Card className="shadow-sm">
           <CardContent className="pt-6">
             {filtered.length === 0 ? (
               <p className="py-12 text-center text-sm text-muted-foreground">

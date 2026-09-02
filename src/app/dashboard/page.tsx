@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Building2, ChevronRight, Users } from "lucide-react";
 import { getAllCompanyStats } from "@/lib/companyStats";
 import { AddCompanySheet } from "@/components/add-company-sheet";
+import { CompanyAvatar } from "@/components/company-avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -35,10 +36,10 @@ export default async function CompaniesPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {companies.map((c) => (
             <Link key={c.clientId} href={`/dashboard/companies/${c.clientId}`}>
-              <Card className="h-full transition-colors hover:border-primary/40 hover:bg-accent/30">
+              <Card className="h-full border-none shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Building2 className="size-4 text-muted-foreground" />
+                  <CardTitle className="flex items-center gap-2.5 text-base">
+                    <CompanyAvatar name={c.name} />
                     {c.name}
                   </CardTitle>
                   <ChevronRight className="size-4 text-muted-foreground" />

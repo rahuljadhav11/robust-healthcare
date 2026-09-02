@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq, asc } from "drizzle-orm";
 import { requireAuthorizedUserId } from "@/lib/authz";
 import { getDb } from "@/db";
-import { chatMessages, employees, clients } from "@/db/schema";
+import { chatMessages, employees, clients, inboxReadState } from "@/db/schema";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/inbox/[number]">) {
   const auth = await requireAuthorizedUserId();
@@ -10,6 +10,14 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/inbox/[numb
 
   const { number } = await ctx.params;
   const db = getDb();
+
+  // Opening (or continuing to poll) this thread marks it read up to now —
+  // any message that arrives while it's open is seen immediately, same as
+  // real WhatsApp/Slack behavior.
+  await db
+    .insert(inboxReadState)
+    .values({ counterpartyNumber: number, lastViewedAt: new Date() })
+    .onConflictDoUpdate({ target: inboxReadState.counterpartyNumber, set: { lastViewedAt: new Date() } });
 
   const rows = await db
     .select({

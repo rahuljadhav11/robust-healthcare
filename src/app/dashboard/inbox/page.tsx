@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Paperclip, Send, MessageCircle, FileText, Download, Building2 } from "lucide-react";
+import { Paperclip, Send, MessageCircle, FileText, Download, Building2, Check, CheckCheck, Clock, AlertCircle, Loader2, BadgeCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CompanyAvatar } from "@/components/company-avatar";
+import { cn } from "@/lib/utils";
 
 interface Conversation {
   counterparty_number: string;
@@ -20,7 +21,7 @@ interface Conversation {
   last_name: string | null;
   emp_id: string | null;
   company_name: string | null;
-  message_count: number;
+  unread_count: string | number;
 }
 
 interface ThreadMessage {
@@ -53,6 +54,11 @@ function conversationName(c: Conversation): string {
   return c.counterparty_number;
 }
 
+function identityName(identity: ThreadIdentity | null, fallback: string): string {
+  if (identity?.firstName) return `${identity.firstName} ${identity.lastName ?? ""}`.trim();
+  return fallback;
+}
+
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diffMs / 60000);
@@ -61,6 +67,32 @@ function timeAgo(iso: string): string {
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+}
+
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+  if (sameDay(d, today)) return "Today";
+  if (sameDay(d, yesterday)) return "Yesterday";
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+}
+
+function MessageStatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case "read":
+      return <CheckCheck className="size-3.5 text-sky-300" />;
+    case "delivered":
+      return <CheckCheck className="size-3.5 opacity-80" />;
+    case "sent":
+      return <Check className="size-3.5 opacity-80" />;
+    case "failed":
+      return <AlertCircle className="size-3.5 text-destructive" />;
+    default:
+      return <Clock className="size-3.5 opacity-70" />;
+  }
 }
 
 export default function InboxPage() {
@@ -132,11 +164,21 @@ export default function InboxPage() {
     }
   }
 
+  function selectConversation(number: string) {
+    setSelected(number);
+    // Optimistically clear the unread badge — the GET to /api/inbox/[number]
+    // that follows marks it read server-side; this just avoids a flash of
+    // stale state until the next inbox-list poll picks it up.
+    setConversations((prev) => (prev ? prev.map((c) => (c.counterparty_number === number ? { ...c, unread_count: 0 } : c)) : prev));
+  }
+
   const selectedConversation = conversations?.find((c) => c.counterparty_number === selected);
+
+  let lastDay: string | null = null;
 
   return (
     <div className="mx-auto flex h-[calc(100vh-3.5rem)] max-w-6xl">
-      <div className="flex w-80 shrink-0 flex-col border-r">
+      <div className="flex w-80 shrink-0 flex-col border-r bg-card">
         <div className="border-b px-4 py-3">
           <h1 className="text-lg font-semibold">Inbox</h1>
           <p className="text-xs text-muted-foreground">Replies from employees, across every company</p>
@@ -153,30 +195,49 @@ export default function InboxPage() {
               No messages yet — when employees reply, they&apos;ll show up here.
             </div>
           ) : (
-            conversations.map((c) => (
-              <button
-                key={c.counterparty_number}
-                onClick={() => setSelected(c.counterparty_number)}
-                className={`flex w-full flex-col gap-0.5 border-b px-4 py-3 text-left transition-colors hover:bg-muted ${
-                  selected === c.counterparty_number ? "bg-muted" : ""
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{conversationName(c)}</span>
-                  <span className="text-[11px] text-muted-foreground">{timeAgo(c.last_at)}</span>
-                </div>
-                {c.company_name && (
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <Building2 className="size-3" />
-                    {c.company_name}
-                  </span>
-                )}
-                <span className="truncate text-xs text-muted-foreground">
-                  {c.last_direction === "outbound" ? "You: " : ""}
-                  {c.last_text ?? (c.last_media_filename ? `📎 ${c.last_media_filename}` : "…")}
-                </span>
-              </button>
-            ))
+            conversations.map((c) => {
+              const unread = Number(c.unread_count) > 0;
+              return (
+                <button
+                  key={c.counterparty_number}
+                  onClick={() => selectConversation(c.counterparty_number)}
+                  className={cn(
+                    "flex w-full items-center gap-3 border-b px-4 py-3 text-left transition-colors hover:bg-muted",
+                    selected === c.counterparty_number && "bg-muted",
+                  )}
+                >
+                  <CompanyAvatar name={conversationName(c)} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={cn("truncate text-sm", unread ? "font-semibold" : "font-medium")}>
+                        {conversationName(c)}
+                      </span>
+                      <span className={cn("shrink-0 text-[11px]", unread ? "font-medium text-chat" : "text-muted-foreground")}>
+                        {timeAgo(c.last_at)}
+                      </span>
+                    </div>
+                    {c.company_name && (
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Building2 className="size-3" />
+                        {c.company_name}
+                        {c.emp_id && <span className="text-muted-foreground/70">· {c.emp_id}</span>}
+                      </span>
+                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={cn("truncate text-xs", unread ? "font-medium text-foreground" : "text-muted-foreground")}>
+                        {c.last_direction === "outbound" ? "You: " : ""}
+                        {c.last_text ?? (c.last_media_filename ? `📎 ${c.last_media_filename}` : "…")}
+                      </span>
+                      {unread && (
+                        <span className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-chat text-[10px] font-semibold text-chat-foreground">
+                          {c.unread_count}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })
           )}
         </ScrollArea>
       </div>
@@ -189,58 +250,108 @@ export default function InboxPage() {
           </div>
         ) : (
           <>
-            <div className="border-b px-4 py-3">
-              <div className="text-sm font-medium">
-                {selectedConversation ? conversationName(selectedConversation) : selected}
+            <div className="flex items-center gap-3 border-b bg-card px-4 py-3">
+              <CompanyAvatar
+                name={thread?.identity ? identityName(thread.identity, selected) : selectedConversation ? conversationName(selectedConversation) : selected}
+              />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-sm font-medium">
+                    {thread?.identity ? identityName(thread.identity, selected) : selectedConversation ? conversationName(selectedConversation) : selected}
+                  </span>
+                  {thread?.identity?.firstName && <BadgeCheck className="size-3.5 shrink-0 text-chat" />}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                  <span>{selected}</span>
+                  {thread?.identity?.companyName && (
+                    <span className="flex items-center gap-1">
+                      <Building2 className="size-3" />
+                      {thread.identity.companyName}
+                    </span>
+                  )}
+                  {thread?.identity?.empId && <span>ID {thread.identity.empId}</span>}
+                  {thread && !thread.identity && (
+                    <span className="text-amber-600 dark:text-amber-400">Not matched to any employee record</span>
+                  )}
+                </div>
               </div>
-              <div className="text-xs text-muted-foreground">{selected}</div>
             </div>
 
-            <ScrollArea className="flex-1 px-4 py-4">
-              <div className="flex flex-col gap-3">
-                {thread?.messages.map((m) => (
-                  <div key={m.id} className={`flex ${m.direction === "outbound" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[70%] rounded-2xl px-3 py-2 text-sm ${
-                        m.direction === "outbound"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-foreground"
-                      }`}
-                    >
-                      {m.textBody && <p className="whitespace-pre-wrap">{m.textBody}</p>}
-                      {m.mediaFilename && (
-                        <a
-                          href={
-                            m.attachmentToken
-                              ? `/api/chat-attachments/${m.attachmentToken}`
-                              : undefined
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-1 flex items-center gap-1.5 rounded-md bg-background/20 px-2 py-1.5 text-xs underline"
-                        >
-                          <FileText className="size-3.5" />
-                          {m.mediaFilename}
-                          <Download className="size-3" />
-                        </a>
-                      )}
-                      <div className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-70">
-                        {new Date(m.createdAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                        {m.direction === "outbound" && (
-                          <Badge variant="outline" className="h-4 border-current px-1 text-[9px]">
-                            {m.status}
-                          </Badge>
-                        )}
-                      </div>
-                      {m.error && <p className="mt-1 text-[10px] text-destructive-foreground">{m.error}</p>}
-                    </div>
+            <ScrollArea
+              className="flex-1 px-4 py-4"
+              style={{
+                backgroundImage:
+                  "radial-gradient(color-mix(in oklch, var(--foreground) 6%, transparent) 1px, transparent 1px)",
+                backgroundSize: "18px 18px",
+              }}
+            >
+              <div className="flex flex-col gap-1">
+                {thread?.number !== selected && (
+                  <div className="flex flex-col gap-2 pt-2">
+                    <Skeleton className="ml-auto h-9 w-1/2 rounded-2xl" />
+                    <Skeleton className="h-9 w-2/3 rounded-2xl" />
+                    <Skeleton className="ml-auto h-9 w-1/3 rounded-2xl" />
                   </div>
-                ))}
+                )}
+                {thread?.number === selected && thread.messages.map((m, i) => {
+                  const showDivider = dayLabel(m.createdAt) !== lastDay;
+                  lastDay = dayLabel(m.createdAt);
+                  const prev = thread.messages[i - 1];
+                  const grouped = !showDivider && prev && prev.direction === m.direction;
+                  return (
+                    <div key={m.id}>
+                      {showDivider && (
+                        <div className="my-3 flex justify-center">
+                          <span className="rounded-full bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-sm">
+                            {dayLabel(m.createdAt)}
+                          </span>
+                        </div>
+                      )}
+                      <div className={cn("flex", m.direction === "outbound" ? "justify-end" : "justify-start", grouped ? "mt-0.5" : "mt-2")}>
+                        <div
+                          className={cn(
+                            "max-w-[70%] rounded-2xl px-3 py-2 text-sm shadow-sm",
+                            m.direction === "outbound"
+                              ? "bg-chat text-chat-foreground rounded-br-md"
+                              : "border bg-card text-foreground rounded-bl-md",
+                          )}
+                        >
+                          {m.textBody && <p className="whitespace-pre-wrap">{m.textBody}</p>}
+                          {m.mediaFilename && (
+                            <a
+                              href={m.attachmentToken ? `/api/chat-attachments/${m.attachmentToken}` : undefined}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={cn(
+                                "mt-1 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs underline",
+                                m.direction === "outbound" ? "bg-background/20" : "bg-muted",
+                              )}
+                            >
+                              <FileText className="size-3.5" />
+                              {m.mediaFilename}
+                              <Download className="size-3" />
+                            </a>
+                          )}
+                          <div
+                            className={cn(
+                              "mt-1 flex items-center justify-end gap-1 text-[10px]",
+                              m.direction === "outbound" ? "opacity-80" : "text-muted-foreground",
+                            )}
+                          >
+                            {new Date(m.createdAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                            {m.direction === "outbound" && <MessageStatusIcon status={m.status} />}
+                          </div>
+                          {m.error && <p className="mt-1 text-[10px] text-destructive">{m.error}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
                 <div ref={bottomRef} />
               </div>
             </ScrollArea>
 
-            <div className="border-t p-3">
+            <div className="border-t bg-card p-3">
               {file && (
                 <div className="mb-2 flex items-center gap-2 rounded-md border px-2 py-1 text-xs">
                   <Paperclip className="size-3.5" />
@@ -272,8 +383,8 @@ export default function InboxPage() {
                     }
                   }}
                 />
-                <Button onClick={handleSend} disabled={sending || (!draft.trim() && !file)}>
-                  <Send />
+                <Button onClick={handleSend} disabled={sending || (!draft.trim() && !file)} className="bg-chat text-chat-foreground hover:bg-chat/90">
+                  {sending ? <Loader2 className="animate-spin" /> : <Send />}
                 </Button>
               </div>
               <p className="mt-1.5 text-[11px] text-muted-foreground">

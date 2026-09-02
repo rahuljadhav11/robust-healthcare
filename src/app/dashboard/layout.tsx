@@ -33,12 +33,16 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center justify-between border-b px-4">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card/60 px-4 backdrop-blur-sm">
           <div className="flex items-center gap-2">
             <SidebarTrigger />
             <Separator orientation="vertical" className="h-4" />
           </div>
-          <UserButton />
+          <UserButton
+            appearance={{
+              elements: { userButtonAvatarBox: "size-8 ring-2 ring-border" },
+            }}
+          />
         </header>
         <main className="flex-1 overflow-auto">{children}</main>
       </SidebarInset>

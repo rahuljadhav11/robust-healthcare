@@ -7,6 +7,7 @@ import { getCompanyStats } from "@/lib/companyStats";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatCard } from "@/components/stat-card";
 
 export default async function CompanyOverviewPage({ params }: PageProps<"/dashboard/companies/[id]">) {
   const { id } = await params;
@@ -34,45 +35,13 @@ export default async function CompanyOverviewPage({ params }: PageProps<"/dashbo
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Employees</CardTitle>
-            <Users className="size-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{stats?.employeeCount ?? 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Delivered</CardTitle>
-            <CheckCircle2 className="size-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{stats?.delivered ?? 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
-            <Clock className="size-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{stats?.pending ?? 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Failed</CardTitle>
-            <AlertCircle className="size-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{stats?.failed ?? 0}</div>
-          </CardContent>
-        </Card>
+        <StatCard icon={Users} label="Employees" value={stats?.employeeCount ?? 0} tone="muted" />
+        <StatCard icon={CheckCircle2} label="Delivered" value={stats?.delivered ?? 0} tone="success" />
+        <StatCard icon={Clock} label="Pending" value={stats?.pending ?? 0} tone="warning" />
+        <StatCard icon={AlertCircle} label="Failed" value={stats?.failed ?? 0} tone="destructive" />
       </div>
 
-      <Card>
+      <Card className="border-none shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent batches</CardTitle>
           <Button variant="ghost" size="sm" asChild>
@@ -93,7 +62,7 @@ export default async function CompanyOverviewPage({ params }: PageProps<"/dashbo
                 <Link
                   key={s.id}
                   href={`/dashboard/companies/${id}/batches/${s.id}`}
-                  className="flex items-center justify-between py-3 hover:opacity-80"
+                  className="flex items-center justify-between rounded-md px-2 py-3 transition-colors hover:bg-muted/60"
                 >
                   <div>
                     <div className="text-sm font-medium">

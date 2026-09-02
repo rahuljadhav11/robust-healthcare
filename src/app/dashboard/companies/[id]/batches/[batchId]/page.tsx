@@ -2,9 +2,8 @@
 
 import { use, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Send, PartyPopper, Eye, RotateCw, MousePointerClick } from "lucide-react";
+import { Send, PartyPopper, Eye, RotateCw, MousePointerClick, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -18,6 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { humanizeError } from "@/lib/errorMessages";
+import { StatusBadge } from "@/components/status-badge";
+import { StatCard } from "@/components/stat-card";
 
 interface MessageRow {
   id: string;
@@ -36,15 +37,6 @@ interface BatchDetail {
   messages: MessageRow[];
   summary: Record<string, number>;
 }
-
-const STATUS_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  pending: { label: "Pending", variant: "outline" },
-  sending: { label: "Sending", variant: "secondary" },
-  sent: { label: "Sent", variant: "default" },
-  delivered: { label: "Delivered", variant: "default" },
-  read: { label: "Read", variant: "default" },
-  failed: { label: "Failed", variant: "destructive" },
-};
 
 export default function BatchDetailPage({ params }: PageProps<"/dashboard/companies/[id]/batches/[batchId]">) {
   const { batchId } = use(params);
@@ -150,16 +142,14 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/compan
       )}
 
       {allDone && failed === 0 && (
-        <Alert className="border-emerald-200 bg-emerald-50 text-emerald-900 [&>svg]:text-emerald-600">
+        <Alert className="border-chat/30 bg-chat/10 [&>svg]:text-chat">
           <PartyPopper />
           <AlertTitle>All reports delivered</AlertTitle>
-          <AlertDescription className="text-emerald-800">
-            Every employee in this batch has received their report.
-          </AlertDescription>
+          <AlertDescription>Every employee in this batch has received their report.</AlertDescription>
         </Alert>
       )}
 
-      <Card>
+      <Card className="border-none shadow-sm">
         <CardContent className="space-y-4 pt-6">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-sm">
@@ -169,23 +159,14 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/compan
             <Progress value={progressPct} />
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-md border p-3">
-              <div className="text-xl font-semibold text-emerald-600">{done}</div>
-              <div className="text-xs text-muted-foreground">Sent</div>
-            </div>
-            <div className="rounded-md border p-3">
-              <div className="text-xl font-semibold text-amber-600">{pending}</div>
-              <div className="text-xs text-muted-foreground">Pending (daily cap applies)</div>
-            </div>
-            <div className="rounded-md border p-3">
-              <div className="text-xl font-semibold text-destructive">{failed}</div>
-              <div className="text-xs text-muted-foreground">Failed</div>
-            </div>
+            <StatCard icon={CheckCircle2} label="Sent" value={done} tone="success" />
+            <StatCard icon={Clock} label="Pending (daily cap applies)" value={pending} tone="warning" />
+            <StatCard icon={AlertCircle} label="Failed" value={failed} tone="destructive" />
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-none shadow-sm">
         <CardHeader>
           <CardTitle className="text-sm font-medium text-muted-foreground">Employees</CardTitle>
         </CardHeader>
@@ -193,7 +174,8 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/compan
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Employee</TableHead>
+                <TableHead>Employee ID</TableHead>
+                <TableHead>Name</TableHead>
                 <TableHead>Mobile</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Reason (if failed)</TableHead>
@@ -202,15 +184,15 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/compan
             </TableHeader>
             <TableBody>
               {data.messages.map((m) => {
-                const badge = STATUS_BADGE[m.status] ?? { label: m.status, variant: "outline" as const };
                 return (
                   <TableRow key={m.id}>
-                    <TableCell className="font-medium">
-                      {m.empId} — {m.firstName} {m.lastName}
+                    <TableCell className="font-medium">{m.empId}</TableCell>
+                    <TableCell>
+                      {m.firstName} {m.lastName}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{m.mobile}</TableCell>
                     <TableCell>
-                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                      <StatusBadge status={m.status} />
                     </TableCell>
                     <TableCell className="max-w-[240px] truncate text-xs text-destructive">
                       {m.status === "failed" ? humanizeError(m.error) : ""}

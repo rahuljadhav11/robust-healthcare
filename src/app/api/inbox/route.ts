@@ -9,8 +9,9 @@ export async function GET() {
 
   const db = getDb();
   // One row per conversation (counterparty number): latest message preview,
-  // employee/company name when matched, and how many messages are inbound
-  // (a crude but cheap "there's activity here" signal in place of read/unread).
+  // employee/company name when matched, and an unread count — inbound
+  // messages newer than this conversation was last opened (see
+  // inbox_read_state / api/inbox/[number]).
   const result = await db.execute(sql`
     SELECT DISTINCT ON (cm.counterparty_number)
       cm.counterparty_number,
@@ -21,10 +22,16 @@ export async function GET() {
       cm.created_at AS last_at,
       e.first_name, e.last_name, e.emp_id,
       c.name AS company_name,
-      (SELECT count(*) FROM chat_messages WHERE counterparty_number = cm.counterparty_number) AS message_count
+      (
+        SELECT count(*) FROM chat_messages
+        WHERE counterparty_number = cm.counterparty_number
+          AND direction = 'inbound'
+          AND created_at > COALESCE(irs.last_viewed_at, 'epoch'::timestamptz)
+      ) AS unread_count
     FROM chat_messages cm
     LEFT JOIN employees e ON e.id = cm.employee_id
     LEFT JOIN clients c ON c.id = cm.client_id
+    LEFT JOIN inbox_read_state irs ON irs.counterparty_number = cm.counterparty_number
     ORDER BY cm.counterparty_number, cm.created_at DESC
   `);
 

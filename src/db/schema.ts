@@ -102,6 +102,15 @@ export const chatMessages = pgTable("chat_messages", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Tracks when an admin last opened each conversation, so the Inbox can show
+// an unread count/badge. Shared across all admins (not per-user) — matches
+// the email-allowlist model where anyone authorized can handle any chat, and
+// avoids building a per-user read model nobody asked for.
+export const inboxReadState = pgTable("inbox_read_state", {
+  counterpartyNumber: text("counterparty_number").primaryKey(),
+  lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Single-row throttle so the (slow, external) MSG91 log sync doesn't run on
 // every 5-second dashboard poll — only after enough time has passed.
 export const syncState = pgTable("sync_state", {

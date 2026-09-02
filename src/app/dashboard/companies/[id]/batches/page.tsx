@@ -35,7 +35,7 @@ export default async function BatchesPage({ params }: PageProps<"/dashboard/comp
     .orderBy(desc(batches.sequence));
 
   return (
-    <Card>
+    <Card className="border-none shadow-sm">
       <CardContent className="pt-6">
         {batchRows.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
@@ -53,7 +53,7 @@ export default async function BatchesPage({ params }: PageProps<"/dashboard/comp
             </TableHeader>
             <TableBody>
               {batchRows.map((s) => (
-                <TableRow key={s.id} className="cursor-pointer">
+                <TableRow key={s.id} className="hover:bg-muted/60">
                   <TableCell className="font-medium">
                     <Link href={`/dashboard/companies/${id}/batches/${s.id}`} className="hover:underline">
                       Batch #{s.sequence}

@@ -15,7 +15,7 @@ export function CompanyTabs({ companyId }: { companyId: string }) {
   ];
 
   return (
-    <nav className="flex gap-1 border-b">
+    <nav className="inline-flex items-center gap-1 rounded-full bg-muted p-1">
       {tabs.map((tab) => {
         const active = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href);
         return (
@@ -23,10 +23,10 @@ export function CompanyTabs({ companyId }: { companyId: string }) {
             key={tab.href}
             href={tab.href}
             className={cn(
-              "border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
               active
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             {tab.label}

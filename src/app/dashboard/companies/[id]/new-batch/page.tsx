@@ -3,7 +3,7 @@
 import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileSpreadsheet, FolderOpen, ShieldCheck, CheckCircle2, AlertTriangle, ListPlus, Search, Eye } from "lucide-react";
+import { FileSpreadsheet, FolderOpen, ShieldCheck, CheckCircle2, AlertTriangle, ListPlus, Search, Eye, Users, FileX, FileWarning, PhoneOff } from "lucide-react";
 import {
   matchEmployeesToPdfs,
   type MatchResult,
@@ -15,6 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { StatCard } from "@/components/stat-card";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -49,6 +52,8 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
   const [excelBusy, setExcelBusy] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [excelDragOver, setExcelDragOver] = useState(false);
+  const [pdfDragOver, setPdfDragOver] = useState(false);
 
   const match: MatchResult | null = useMemo(() => {
     if (!rows || pdfFiles.length === 0) return null;
@@ -63,8 +68,7 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
     setSelectedRows(new Set(match?.matched.map((m) => m.row.rowNumber) ?? []));
   }
 
-  async function handleExcelChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  async function handleExcelFile(file: File | undefined) {
     if (!file) return;
     setExcelBusy(true);
     try {
@@ -83,8 +87,8 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
     }
   }
 
-  function handlePdfFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []).filter((f) => f.name.toLowerCase().endsWith(".pdf"));
+  function handlePdfFiles(fileList: FileList | File[] | null | undefined) {
+    const files = Array.from(fileList ?? []).filter((f) => f.name.toLowerCase().endsWith(".pdf"));
     setPdfFiles(files);
     if (files.length > 0) toast.success(`${files.length} PDFs found`);
   }
@@ -189,7 +193,7 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
   return (
     <div className="space-y-4">
       <div className="space-y-4">
-        <Card>
+        <Card className="border-none shadow-sm">
           <CardHeader className="flex flex-row items-start gap-3 space-y-0">
             <StepNumber n={1} done={Boolean(rows)} />
             <div>
@@ -207,21 +211,41 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                 placeholder="e.g. August health checkup"
               />
             </div>
-            <label className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-dashed px-4 py-3 text-sm hover:bg-muted">
+            <label
+              onDragOver={(e) => {
+                e.preventDefault();
+                setExcelDragOver(true);
+              }}
+              onDragLeave={() => setExcelDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setExcelDragOver(false);
+                handleExcelFile(e.dataTransfer.files?.[0]);
+              }}
+              className={cn(
+                "flex w-fit cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-sm transition-colors",
+                excelDragOver ? "border-primary bg-primary/5" : "hover:bg-muted",
+              )}
+            >
               <FileSpreadsheet className="size-4 text-muted-foreground" />
-              {excelBusy ? "Reading…" : rows ? "Choose a different file" : "Choose Excel file"}
-              <input type="file" accept=".xlsx,.xls" onChange={handleExcelChange} className="hidden" />
+              {excelBusy ? "Reading…" : rows ? "Choose a different file" : "Choose or drop an Excel file"}
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) => handleExcelFile(e.target.files?.[0])}
+                className="hidden"
+              />
             </label>
             {rows && (
               <p className="text-sm text-muted-foreground">
-                <CheckCircle2 className="mr-1 inline size-3.5 text-emerald-600" />
+                <CheckCircle2 className="mr-1 inline size-3.5 text-chat" />
                 {rows.length} employees found
               </p>
             )}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-none shadow-sm">
           <CardHeader className="flex flex-row items-start gap-3 space-y-0">
             <StepNumber n={2} done={pdfFiles.length > 0} />
             <div>
@@ -233,14 +257,35 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
             </div>
           </CardHeader>
           <CardContent className="pl-[52px]">
-            <label className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-dashed px-4 py-3 text-sm hover:bg-muted">
+            <label
+              onDragOver={(e) => {
+                e.preventDefault();
+                setPdfDragOver(true);
+              }}
+              onDragLeave={() => setPdfDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setPdfDragOver(false);
+                handlePdfFiles(e.dataTransfer.files);
+              }}
+              className={cn(
+                "flex w-fit cursor-pointer items-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-sm transition-colors",
+                pdfDragOver ? "border-primary bg-primary/5" : "hover:bg-muted",
+              )}
+            >
               <FolderOpen className="size-4 text-muted-foreground" />
-              {pdfFiles.length > 0 ? "Choose different PDF files" : "Choose PDF files"}
-              <input type="file" accept=".pdf" multiple onChange={handlePdfFilesChange} className="hidden" />
+              {pdfFiles.length > 0 ? "Choose different PDF files" : "Choose or drop PDF files"}
+              <input
+                type="file"
+                accept=".pdf"
+                multiple
+                onChange={(e) => handlePdfFiles(e.target.files)}
+                className="hidden"
+              />
             </label>
             {pdfFiles.length > 0 && (
               <p className="mt-2 text-sm text-muted-foreground">
-                <CheckCircle2 className="mr-1 inline size-3.5 text-emerald-600" />
+                <CheckCircle2 className="mr-1 inline size-3.5 text-chat" />
                 {pdfFiles.length} PDFs found
               </p>
             )}
@@ -248,7 +293,7 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
         </Card>
 
         {match && (
-          <Card>
+          <Card className="border-none shadow-sm">
             <CardHeader className="flex flex-row items-start gap-3 space-y-0">
               <StepNumber n={3} />
               <div>
@@ -258,25 +303,15 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
             </CardHeader>
             <CardContent className="space-y-4 pl-[52px]">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-md border p-3">
-                  <div className="text-xl font-semibold text-emerald-600">
-                    {selectedMatched.length}
-                    <span className="text-sm font-normal text-muted-foreground">/{match.matched.length}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">Selected to send</div>
-                </div>
-                <div className="rounded-md border p-3">
-                  <div className="text-xl font-semibold text-amber-600">{match.unmatchedEmployees.length}</div>
-                  <div className="text-xs text-muted-foreground">No PDF found</div>
-                </div>
-                <div className="rounded-md border p-3">
-                  <div className="text-xl font-semibold text-amber-600">{match.unmatchedPdfs.length}</div>
-                  <div className="text-xs text-muted-foreground">PDF has no employee</div>
-                </div>
-                <div className="rounded-md border p-3">
-                  <div className="text-xl font-semibold text-destructive">{match.invalidMobiles.length}</div>
-                  <div className="text-xs text-muted-foreground">Invalid mobile number</div>
-                </div>
+                <StatCard
+                  icon={Users}
+                  label="Selected to send"
+                  value={`${selectedMatched.length}/${match.matched.length}`}
+                  tone="success"
+                />
+                <StatCard icon={FileX} label="No PDF found" value={match.unmatchedEmployees.length} tone="warning" />
+                <StatCard icon={FileWarning} label="PDF has no employee" value={match.unmatchedPdfs.length} tone="warning" />
+                <StatCard icon={PhoneOff} label="Invalid mobile number" value={match.invalidMobiles.length} tone="destructive" />
               </div>
 
               {match.matched.length > 0 && (
@@ -369,54 +404,63 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                 </Alert>
               )}
 
-              {match.unmatchedEmployees.length > 0 && (
-                <details className="rounded-md border">
-                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-amber-700">
-                    {match.unmatchedEmployees.length} employees without a matching PDF — they won&apos;t be sent
-                  </summary>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Employee ID</TableHead>
-                        <TableHead>Name</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {match.unmatchedEmployees.slice(0, 200).map((r) => (
-                        <TableRow key={r.rowNumber}>
-                          <TableCell>{r.empId}</TableCell>
-                          <TableCell>
-                            {r.firstName} {r.lastName}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </details>
-              )}
+              {(match.unmatchedEmployees.length > 0 || match.invalidMobiles.length > 0) && (
+                <Accordion type="multiple" className="rounded-lg border px-3">
+                  {match.unmatchedEmployees.length > 0 && (
+                    <AccordionItem value="unmatched">
+                      <AccordionTrigger className="text-amber-700 dark:text-amber-400">
+                        {match.unmatchedEmployees.length} employees without a matching PDF — they won&apos;t be sent
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Employee ID</TableHead>
+                              <TableHead>Name</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {match.unmatchedEmployees.slice(0, 200).map((r) => (
+                              <TableRow key={r.rowNumber}>
+                                <TableCell>{r.empId}</TableCell>
+                                <TableCell>
+                                  {r.firstName} {r.lastName}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
 
-              {match.invalidMobiles.length > 0 && (
-                <details className="rounded-md border">
-                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-destructive">
-                    {match.invalidMobiles.length} employees with an invalid mobile number — they won&apos;t be sent
-                  </summary>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Employee ID</TableHead>
-                        <TableHead>Mobile</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {match.invalidMobiles.slice(0, 200).map((r) => (
-                        <TableRow key={r.rowNumber}>
-                          <TableCell>{r.empId}</TableCell>
-                          <TableCell>{r.mobile}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </details>
+                  {match.invalidMobiles.length > 0 && (
+                    <AccordionItem value="invalid-mobiles">
+                      <AccordionTrigger className="text-destructive">
+                        {match.invalidMobiles.length} employees with an invalid mobile number — they won&apos;t be
+                        sent
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Employee ID</TableHead>
+                              <TableHead>Mobile</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {match.invalidMobiles.slice(0, 200).map((r) => (
+                              <TableRow key={r.rowNumber}>
+                                <TableCell>{r.empId}</TableCell>
+                                <TableCell>{r.mobile}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
+                </Accordion>
               )}
 
               <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">

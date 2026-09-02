@@ -93,7 +93,7 @@ export default function InsightsPage() {
               Global — last 30 days (your whole MSG91 account)
             </p>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Delivery rate</CardTitle>
                 </CardHeader>
@@ -106,7 +106,7 @@ export default function InsightsPage() {
                   <p className="text-xs text-muted-foreground">{totals?.delivered ?? 0} of {totals?.total ?? 0} sent</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Read rate</CardTitle>
                 </CardHeader>
@@ -119,7 +119,7 @@ export default function InsightsPage() {
                   <p className="text-xs text-muted-foreground">of delivered messages</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Avg. delivery time</CardTitle>
                 </CardHeader>
@@ -133,7 +133,7 @@ export default function InsightsPage() {
                   <p className="text-xs text-muted-foreground">send to delivered</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Spend</CardTitle>
                 </CardHeader>
@@ -148,7 +148,7 @@ export default function InsightsPage() {
             </div>
           </div>
 
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="text-sm font-medium text-muted-foreground">Messages per day</CardTitle>
             </CardHeader>
@@ -181,7 +181,7 @@ export default function InsightsPage() {
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Local — by company (from your own records)
             </p>
-            <Card>
+            <Card className="shadow-sm">
               <CardContent className="divide-y pt-6">
                 {data.companies.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">No companies yet.</p>
