@@ -40,7 +40,7 @@ export default function FailedPage() {
   const [retrying, setRetrying] = useState<string | null>(null);
 
   async function load() {
-    const res = await fetch("/api/failed");
+    const res = await fetch("/api/failed", { cache: "no-store" });
     if (res.ok) setFailed((await res.json()).failed);
   }
 
@@ -111,12 +111,12 @@ export default function FailedPage() {
                 {failed.length === 0 ? "Nothing failed — everything sent is either delivered or on its way." : `No matches for "${search}"`}
               </p>
             ) : (
-              <Table>
+              <Table className="table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Mobile</TableHead>
+                    <TableHead className="w-40">Company</TableHead>
+                    <TableHead className="w-48">Employee</TableHead>
+                    <TableHead className="w-32">Mobile</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead className="w-24" />
                   </TableRow>
@@ -124,18 +124,20 @@ export default function FailedPage() {
                 <TableBody>
                   {filtered.map((f) => (
                     <TableRow key={f.id}>
-                      <TableCell>
+                      <TableCell className="align-top whitespace-normal break-words">
                         <Link href={`/dashboard/companies/${f.companyId}/batches/${f.batchId}`} className="hover:underline">
                           {f.companyName}
                         </Link>
                         <div className="text-xs text-muted-foreground">Batch #{f.batchSequence}</div>
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="align-top font-medium whitespace-normal break-words">
                         {f.empId} — {f.firstName} {f.lastName}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{f.mobile}</TableCell>
-                      <TableCell className="max-w-[280px] text-xs text-destructive">{humanizeError(f.error)}</TableCell>
-                      <TableCell>
+                      <TableCell className="align-top text-muted-foreground">{f.mobile}</TableCell>
+                      <TableCell className="align-top text-xs whitespace-normal break-words text-destructive">
+                        {humanizeError(f.error)}
+                      </TableCell>
+                      <TableCell className="align-top">
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="icon" className="size-7" asChild>
                             <a href={`/api/messages/${f.id}/preview`} target="_blank" rel="noopener noreferrer">

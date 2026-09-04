@@ -11,5 +11,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/companies/[
   await syncSentMessageStatuses().catch(() => null);
 
   const employees = await getEmployeesWithLatestStatus(id);
-  return NextResponse.json({ employees });
+  return NextResponse.json(
+    { employees },
+    { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=45" } },
+  );
 }

@@ -171,13 +171,13 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/compan
           <CardTitle className="text-sm font-medium text-muted-foreground">Employees</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead>Employee ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Mobile</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="w-32">Employee ID</TableHead>
+                <TableHead className="w-40">Name</TableHead>
+                <TableHead className="w-32">Mobile</TableHead>
+                <TableHead className="w-32">Status</TableHead>
                 <TableHead>Reason (if failed)</TableHead>
                 <TableHead className="w-20" />
               </TableRow>
@@ -186,18 +186,18 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/compan
               {data.messages.map((m) => {
                 return (
                   <TableRow key={m.id}>
-                    <TableCell className="font-medium">{m.empId}</TableCell>
-                    <TableCell>
+                    <TableCell className="align-top font-medium">{m.empId}</TableCell>
+                    <TableCell className="align-top whitespace-normal break-words">
                       {m.firstName} {m.lastName}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{m.mobile}</TableCell>
-                    <TableCell>
+                    <TableCell className="align-top text-muted-foreground">{m.mobile}</TableCell>
+                    <TableCell className="align-top">
                       <StatusBadge status={m.status} />
                     </TableCell>
-                    <TableCell className="max-w-[240px] truncate text-xs text-destructive">
+                    <TableCell className="align-top text-xs whitespace-normal break-words text-destructive">
                       {m.status === "failed" ? humanizeError(m.error) : ""}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="align-top">
                       <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" className="size-7" asChild>
                           <a href={`/api/messages/${m.id}/preview`} target="_blank" rel="noopener noreferrer">

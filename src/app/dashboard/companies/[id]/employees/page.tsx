@@ -17,15 +17,24 @@ import {
 import { humanizeError } from "@/lib/errorMessages";
 import type { EmployeeWithLatestStatus } from "@/lib/employeeStatus";
 import { StatusBadge } from "@/components/status-badge";
+import { PaginationBar } from "@/components/pagination-bar";
+
+const PAGE_SIZE = 50;
 
 export default function EmployeesPage({ params }: PageProps<"/dashboard/companies/[id]/employees">) {
   const { id } = use(params);
   const [employees, setEmployees] = useState<EmployeeWithLatestStatus[] | null>(null);
   const [search, setSearch] = useState("");
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pagedSearch, setPagedSearch] = useState(search);
+  if (search !== pagedSearch) {
+    setPagedSearch(search);
+    setPage(1);
+  }
 
   async function load() {
-    const res = await fetch(`/api/companies/${id}/employees`);
+    const res = await fetch(`/api/companies/${id}/employees`, { cache: "no-store" });
     if (!res.ok) return;
     const data = await res.json();
     setEmployees(data.employees);
@@ -55,6 +64,11 @@ export default function EmployeesPage({ params }: PageProps<"/dashboard/companie
         e.mobile.includes(q),
     );
   }, [employees, search]);
+
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page],
+  );
 
   async function handleRetry(messageId: string) {
     setRetrying(messageId);
@@ -95,66 +109,69 @@ export default function EmployeesPage({ params }: PageProps<"/dashboard/companie
       </div>
 
       <div className="rounded-xl border bg-card shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Employee ID</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Mobile</TableHead>
-              <TableHead>Latest status</TableHead>
-              <TableHead>Reason (if failed)</TableHead>
-              <TableHead className="w-20" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((e) => {
-              return (
-                <TableRow key={e.id}>
-                  <TableCell className="font-medium">{e.emp_id}</TableCell>
-                  <TableCell>
-                    {e.first_name} {e.last_name}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{e.mobile}</TableCell>
-                  <TableCell>
-                    {e.status ? <StatusBadge status={e.status} /> : <span className="text-muted-foreground text-xs">Never sent</span>}
-                  </TableCell>
-                  <TableCell className="max-w-[280px] truncate text-xs text-destructive">
-                    {e.status === "failed" ? humanizeError(e.error) : ""}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      {e.message_id && (
-                        <Button variant="ghost" size="icon" className="size-7" asChild>
-                          <a href={`/api/messages/${e.message_id}/preview`} target="_blank" rel="noopener noreferrer">
-                            <Eye className="size-3.5" />
-                          </a>
-                        </Button>
-                      )}
-                      {e.status === "failed" && e.message_id && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-7"
-                          disabled={retrying === e.message_id}
-                          onClick={() => handleRetry(e.message_id!)}
-                        >
-                          <RotateCw className={`size-3.5 ${retrying === e.message_id ? "animate-spin" : ""}`} />
-                        </Button>
-                      )}
-                    </div>
+        <div className="max-h-[65vh] overflow-y-auto">
+          <Table className="table-fixed" containerClassName="overflow-visible">
+            <TableHeader className="sticky top-0 z-10 bg-card">
+              <TableRow>
+                <TableHead className="w-32">Employee ID</TableHead>
+                <TableHead className="w-40">Name</TableHead>
+                <TableHead className="w-32">Mobile</TableHead>
+                <TableHead className="w-32">Latest status</TableHead>
+                <TableHead>Reason (if failed)</TableHead>
+                <TableHead className="w-20" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginated.map((e) => {
+                return (
+                  <TableRow key={e.id}>
+                    <TableCell className="align-top font-medium">{e.emp_id}</TableCell>
+                    <TableCell className="align-top whitespace-normal break-words">
+                      {e.first_name} {e.last_name}
+                    </TableCell>
+                    <TableCell className="align-top text-muted-foreground">{e.mobile}</TableCell>
+                    <TableCell className="align-top">
+                      {e.status ? <StatusBadge status={e.status} /> : <span className="text-muted-foreground text-xs">Never sent</span>}
+                    </TableCell>
+                    <TableCell className="align-top text-xs whitespace-normal break-words text-destructive">
+                      {e.status === "failed" ? humanizeError(e.error) : ""}
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <div className="flex items-center gap-1">
+                        {e.message_id && (
+                          <Button variant="ghost" size="icon" className="size-7" asChild>
+                            <a href={`/api/messages/${e.message_id}/preview`} target="_blank" rel="noopener noreferrer">
+                              <Eye className="size-3.5" />
+                            </a>
+                          </Button>
+                        )}
+                        {e.status === "failed" && e.message_id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7"
+                            disabled={retrying === e.message_id}
+                            onClick={() => handleRetry(e.message_id!)}
+                          >
+                            <RotateCw className={`size-3.5 ${retrying === e.message_id ? "animate-spin" : ""}`} />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    {employees.length === 0 ? "No employees yet — send a batch to add some." : `No matches for "${search}"`}
                   </TableCell>
                 </TableRow>
-              );
-            })}
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  {employees.length === 0 ? "No employees yet — send a batch to add some." : `No matches for "${search}"`}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        <PaginationBar page={page} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={setPage} />
       </div>
     </div>
   );

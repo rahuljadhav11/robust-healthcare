@@ -31,5 +31,8 @@ export async function GET() {
     .where(eq(messages.status, "failed"))
     .orderBy(desc(messages.updatedAt));
 
-  return NextResponse.json({ failed: rows });
+  return NextResponse.json(
+    { failed: rows },
+    { headers: { "Cache-Control": "private, max-age=15, stale-while-revalidate=45" } },
+  );
 }

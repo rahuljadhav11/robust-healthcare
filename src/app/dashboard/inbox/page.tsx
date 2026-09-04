@@ -177,13 +177,13 @@ export default function InboxPage() {
   let lastDay: string | null = null;
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-3.5rem)] max-w-6xl border-x shadow-lg">
-      <div className="flex w-80 shrink-0 flex-col border-r bg-card">
+    <div className="mx-auto flex h-[calc(100vh-3.5rem)] max-w-6xl overflow-hidden border-x shadow-lg">
+      <div className="flex min-h-0 w-80 shrink-0 flex-col border-r bg-card">
         <div className="border-b px-4 py-3">
           <h1 className="text-lg font-semibold">Inbox</h1>
           <p className="text-xs text-muted-foreground">Replies from employees, across every company</p>
         </div>
-        <ScrollArea className="flex-1">
+        <ScrollArea className="min-h-0 flex-1">
           {conversations === null ? (
             <div className="space-y-2 p-3">
               <Skeleton className="h-14 w-full" />
@@ -242,7 +242,7 @@ export default function InboxPage() {
         </ScrollArea>
       </div>
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         {!selected ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
             <MessageCircle className="size-8" />
@@ -286,7 +286,7 @@ export default function InboxPage() {
             </div>
 
             <ScrollArea
-              className="flex-1 px-4 py-4"
+              className="min-h-0 flex-1 px-4 py-4"
               style={{
                 backgroundImage:
                   "radial-gradient(color-mix(in oklch, var(--foreground) 6%, transparent) 1px, transparent 1px)",
