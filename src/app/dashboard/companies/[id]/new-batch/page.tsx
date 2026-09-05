@@ -158,6 +158,17 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
   // Files this run of "Queue" is actively uploading — drives the progress bar.
   const [uploadBatch, setUploadBatch] = useState<string[]>([]);
   const uploadBatchDone = uploadBatch.filter((name) => uploads.get(name)?.status === "done").length;
+  // Files upload several at a time, so counting only fully-finished files
+  // makes the bar sit at 0% and then jump — this averages each file's own
+  // live byte progress instead, so it visibly creeps forward the whole time.
+  const uploadOverallProgress =
+    uploadBatch.length > 0
+      ? uploadBatch.reduce((sum, name) => {
+          const u = uploads.get(name);
+          if (!u || u.status !== "uploading") return sum + 100;
+          return sum + u.progress;
+        }, 0) / uploadBatch.length
+      : 0;
 
   const allSelectedUploaded =
     selectedMatched.length > 0 && selectedMatched.every((m) => uploads.get(m.pdfFilename)?.status === "done");
@@ -556,12 +567,10 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                       Uploading PDFs…
                     </p>
                     <div className="flex items-center gap-3">
-                      <div className="h-5 w-full overflow-hidden rounded-full border border-border bg-muted">
+                      <div className="h-4 w-full overflow-hidden rounded-full border border-border bg-muted">
                         <div
                           className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
-                          style={{
-                            width: `${uploadBatch.length > 0 ? (uploadBatchDone / uploadBatch.length) * 100 : 0}%`,
-                          }}
+                          style={{ width: `${uploadOverallProgress}%` }}
                         />
                       </div>
                       <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
