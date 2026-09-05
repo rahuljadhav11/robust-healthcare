@@ -221,19 +221,21 @@ export default function InboxPage() {
                   key={c.counterparty_number}
                   onClick={() => selectConversation(c.counterparty_number)}
                   className={cn(
-                    "flex w-full items-center gap-3 border-b border-l-2 border-l-transparent px-4 py-3 text-left transition-colors hover:bg-muted",
-                    unread && "border-l-chat bg-chat/[0.06] hover:bg-chat/10",
+                    "flex w-full items-center gap-3 border-b border-l-4 border-l-transparent px-4 py-3 text-left transition-colors",
+                    unread ? "border-l-chat bg-chat/10 hover:bg-chat/15" : "hover:bg-muted",
                     selected === c.counterparty_number && "bg-muted",
                   )}
                 >
-                  <CompanyAvatar name={conversationName(c)} />
+                  <div className={cn(!unread && "opacity-60")}>
+                    <CompanyAvatar name={conversationName(c)} />
+                  </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className={cn("flex min-w-0 items-center gap-1.5 truncate text-sm", unread ? "font-semibold text-foreground" : "font-medium text-muted-foreground")}>
-                        {unread && <span className="size-2 shrink-0 rounded-full bg-chat" />}
+                      <span className={cn("flex min-w-0 items-center gap-1.5 truncate text-sm", unread ? "font-bold text-foreground" : "font-normal text-muted-foreground")}>
+                        {unread && <span className="size-2.5 shrink-0 rounded-full bg-chat" />}
                         <span className="truncate">{conversationName(c)}</span>
                       </span>
-                      <span className={cn("shrink-0 text-[11px]", unread ? "font-semibold text-chat" : "text-muted-foreground")}>
+                      <span className={cn("shrink-0 text-[11px]", unread ? "font-bold text-chat" : "text-muted-foreground")}>
                         {timeAgo(c.last_at)}
                       </span>
                     </div>
@@ -245,12 +247,12 @@ export default function InboxPage() {
                       </span>
                     )}
                     <div className="flex items-center justify-between gap-2">
-                      <span className={cn("truncate text-xs", unread ? "font-medium text-foreground" : "text-muted-foreground")}>
+                      <span className={cn("truncate text-xs", unread ? "font-semibold text-foreground" : "text-muted-foreground")}>
                         {c.last_direction === "outbound" ? "You: " : ""}
                         {c.last_text ?? (c.last_media_filename ? `📎 ${c.last_media_filename}` : "…")}
                       </span>
                       {unread && (
-                        <span className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-chat text-[10px] font-semibold text-chat-foreground">
+                        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-chat px-1 text-[11px] font-bold text-chat-foreground">
                           {c.unread_count}
                         </span>
                       )}

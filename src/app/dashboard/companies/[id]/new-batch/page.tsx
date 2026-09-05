@@ -556,7 +556,7 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                     </div>
                     <Progress
                       value={uploadBatch.length > 0 ? (uploadBatchDone / uploadBatch.length) * 100 : 0}
-                      className="h-2.5 bg-primary/15"
+                      className="h-2.5"
                     />
                   </div>
                 )}
