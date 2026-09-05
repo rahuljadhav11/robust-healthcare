@@ -1,7 +1,9 @@
+import { Inbox } from "lucide-react";
 import { getDb } from "@/db";
 import { batches, messages } from "@/db/schema";
 import { desc, eq, sql } from "drizzle-orm";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
 import { BatchesTable } from "./batches-table";
 
 export default async function BatchesPage({ params }: PageProps<"/dashboard/companies/[id]/batches">) {
@@ -29,9 +31,7 @@ export default async function BatchesPage({ params }: PageProps<"/dashboard/comp
     <Card className="border-none shadow-sm">
       <CardContent className="pt-6">
         {batchRows.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            No batches yet — click &quot;New batch&quot; to get started.
-          </p>
+          <EmptyState icon={Inbox} title="No batches yet" description='Click "New batch" above to get started.' />
         ) : (
           <BatchesTable
             companyId={id}

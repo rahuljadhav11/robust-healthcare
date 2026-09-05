@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { AlertCircle, ArrowLeft, Eye, RotateCw, Search } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Eye, RotateCw, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CompanyAvatar } from "@/components/company-avatar";
 import { PaginationBar } from "@/components/pagination-bar";
+import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@/components/empty-state";
 import {
   Table,
   TableBody,
@@ -135,17 +137,15 @@ export default function FailedPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 px-6 py-8">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <AlertCircle className="size-5 text-destructive" />
-          Failed messages
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {selectedGroup
+      <PageHeader
+        icon={AlertCircle}
+        title="Failed messages"
+        description={
+          selectedGroup
             ? `Failed sends for ${selectedGroup.companyName}.`
-            : "Every failed send, grouped by company — click a company to see the details."}
-        </p>
-      </div>
+            : "Every failed send, grouped by company — click a company to see the details."
+        }
+      />
 
       {failed === null ? (
         <Skeleton className="h-96 w-full" />
@@ -163,8 +163,13 @@ export default function FailedPage() {
 
           {companyGroups.length === 0 ? (
             <Card className="shadow-sm">
-              <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                Nothing failed — everything sent is either delivered or on its way.
+              <CardContent>
+                <EmptyState
+                  icon={CheckCircle2}
+                  tone="success"
+                  title="Nothing failed"
+                  description="Everything sent is either delivered or on its way."
+                />
               </CardContent>
             </Card>
           ) : filteredCompanyGroups.length === 0 ? (

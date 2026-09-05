@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyAvatar } from "@/components/company-avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn, timeAgo } from "@/lib/utils";
 
 interface Conversation {
   counterparty_number: string;
@@ -58,16 +58,6 @@ function conversationName(c: Conversation): string {
 function identityName(identity: ThreadIdentity | null, fallback: string): string {
   if (identity?.firstName) return `${identity.firstName} ${identity.lastName ?? ""}`.trim();
   return fallback;
-}
-
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
 function dayLabel(iso: string): string {

@@ -12,6 +12,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { PageHeader } from "@/components/page-header";
 
 interface AnalyticsDay {
   date: string;
@@ -70,21 +71,17 @@ export default function InsightsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <BarChart3 className="size-5 text-muted-foreground" />
-            Insights
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Global numbers straight from MSG91&apos;s account, plus a per-company breakdown from your own data.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-          <RefreshCw className={loading ? "animate-spin" : ""} />
-          Refresh
-        </Button>
-      </div>
+      <PageHeader
+        icon={BarChart3}
+        title="Insights"
+        description="Global numbers straight from MSG91's account, plus a per-company breakdown from your own data."
+        action={
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={loading ? "animate-spin" : ""} />
+            Refresh
+          </Button>
+        }
+      />
 
       {!data ? (
         <Skeleton className="h-96 w-full" />
