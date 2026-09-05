@@ -16,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { StatCard } from "@/components/stat-card";
 import { cn } from "@/lib/utils";
@@ -188,6 +187,7 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
       setUploadBatch(filesToUpload.map((f) => f.name));
       patchUploads(filesToUpload.map((f) => [f.name, { status: "uploading", progress: 0 }]));
 
+      const startedAt = Date.now();
       const { results, failures } = await uploadPdfsToBlob(filesToUpload, clientId, (file, percentage) => {
         patchUploads([[file.name, { status: "uploading", progress: percentage }]]);
       });
@@ -199,6 +199,12 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
         ]),
         ...failures.map((f): [string, PdfUploadState] => [f.file.name, { status: "error", progress: 0, error: f.error }]),
       ]);
+
+      // A handful of small PDFs can upload in well under a second — keep the
+      // progress bar on screen for a perceptible minimum so it doesn't just flash by.
+      const MIN_VISIBLE_MS = 600;
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < MIN_VISIBLE_MS) await new Promise((resolve) => setTimeout(resolve, MIN_VISIBLE_MS - elapsed));
 
       if (failures.length > 0) {
         toast.error(
@@ -544,7 +550,7 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
 
               <div className="space-y-2">
                 {uploadingPdfs && (
-                  <div className="max-w-md space-y-1.5">
+                  <div className="w-1/2 min-w-[280px] space-y-1.5">
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <Loader2 className="size-3.5 animate-spin" />
@@ -554,10 +560,14 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                         {uploadBatchDone}/{uploadBatch.length}
                       </span>
                     </div>
-                    <Progress
-                      value={uploadBatch.length > 0 ? (uploadBatchDone / uploadBatch.length) * 100 : 0}
-                      className="h-2.5"
-                    />
+                    <div className="h-3 w-full overflow-hidden rounded-full border border-border bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                        style={{
+                          width: `${uploadBatch.length > 0 ? (uploadBatchDone / uploadBatch.length) * 100 : 0}%`,
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
                 {allSelectedUploaded ? (
