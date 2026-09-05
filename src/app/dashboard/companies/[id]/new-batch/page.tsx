@@ -16,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Progress } from "@/components/ui/progress";
 import { StatCard } from "@/components/stat-card";
 import { cn } from "@/lib/utils";
 import {
@@ -155,68 +154,88 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
     filteredMatched.length > 0 && filteredMatched.every((m) => selectedRows.has(m.row.rowNumber));
   const someFilteredSelected = filteredMatched.some((m) => selectedRows.has(m.row.rowNumber));
 
-  // Files this run of "Queue" is actively uploading — drives the bottom progress bar.
+  // Files this run of "Queue" is actively uploading — drives the progress bar.
   const [uploadBatch, setUploadBatch] = useState<string[]>([]);
   const uploadBatchDone = uploadBatch.filter((name) => uploads.get(name)?.status === "done").length;
+  // Continuous 0-100 progress across every file in this upload round — a
+  // finished (or failed/settled) file counts as 100, an in-flight one uses
+  // its own live byte-progress, so the bar actually creeps forward instead
+  // of sitting at 0 until a whole file completes.
+  const uploadOverallProgress =
+    uploadBatch.length > 0
+      ? uploadBatch.reduce((sum, name) => {
+          const u = uploads.get(name);
+          if (!u || u.status !== "uploading") return sum + 100;
+          return sum + u.progress;
+        }, 0) / uploadBatch.length
+      : 0;
 
-  async function handleConfirm() {
+  const allSelectedUploaded =
+    selectedMatched.length > 0 && selectedMatched.every((m) => uploads.get(m.pdfFilename)?.status === "done");
+  const anySelectedFailed = selectedMatched.some((m) => uploads.get(m.pdfFilename)?.status === "error");
+
+  async function handleUploadClick() {
     if (!match || selectedMatched.length === 0) return;
     setBusy(true);
     try {
-      // Snapshot of anything already uploaded from a previous attempt, so
-      // retrying after a partial failure only re-uploads what actually failed.
-      const uploaded = new Map<string, { url: string; pathname: string }>();
-      for (const [name, u] of uploads) {
-        if (u.status === "done" && u.blobUrl && u.blobPathname) uploaded.set(name, { url: u.blobUrl, pathname: u.blobPathname });
-      }
-
+      const alreadyDone = new Set(
+        [...uploads.entries()].filter(([, u]) => u.status === "done").map(([name]) => name),
+      );
       const neededNames = new Set(selectedMatched.map((m) => m.pdfFilename));
-      const filesToUpload = pdfFiles.filter((f) => neededNames.has(f.name) && !uploaded.has(f.name));
+      const filesToUpload = pdfFiles.filter((f) => neededNames.has(f.name) && !alreadyDone.has(f.name));
+      if (filesToUpload.length === 0) return;
 
-      if (filesToUpload.length > 0) {
-        setUploadingPdfs(true);
-        setUploadBatch(filesToUpload.map((f) => f.name));
+      setUploadingPdfs(true);
+      setUploadBatch(filesToUpload.map((f) => f.name));
+      setUploads((prev) => {
+        const next = new Map(prev);
+        for (const f of filesToUpload) next.set(f.name, { status: "uploading", progress: 0 });
+        return next;
+      });
+
+      const { results, failures } = await uploadPdfsToBlob(filesToUpload, clientId, (file, percentage) => {
         setUploads((prev) => {
           const next = new Map(prev);
-          for (const f of filesToUpload) next.set(f.name, { status: "uploading", progress: 0 });
+          next.set(file.name, { status: "uploading", progress: percentage });
           return next;
         });
+      });
 
-        const { results, failures } = await uploadPdfsToBlob(filesToUpload, clientId, (file, percentage) => {
-          setUploads((prev) => {
-            const next = new Map(prev);
-            next.set(file.name, { status: "uploading", progress: percentage });
-            return next;
-          });
-        });
+      setUploads((prev) => {
+        const next = new Map(prev);
+        for (const r of results) next.set(r.file.name, { status: "done", progress: 100, blobUrl: r.url, blobPathname: r.pathname });
+        for (const f of failures) next.set(f.file.name, { status: "error", progress: 0, error: f.error });
+        return next;
+      });
 
-        setUploads((prev) => {
-          const next = new Map(prev);
-          for (const r of results) next.set(r.file.name, { status: "done", progress: 100, blobUrl: r.url, blobPathname: r.pathname });
-          for (const f of failures) next.set(f.file.name, { status: "error", progress: 0, error: f.error });
-          return next;
-        });
-        setUploadingPdfs(false);
-
-        if (failures.length > 0) {
-          toast.error(
-            `${failures.length} of ${filesToUpload.length} PDFs failed to upload — click "Queue" again to retry just those.`,
-          );
-          return;
-        }
-        for (const r of results) uploaded.set(r.file.name, { url: r.url, pathname: r.pathname });
+      if (failures.length > 0) {
+        toast.error(
+          `${failures.length} of ${filesToUpload.length} PDFs failed to upload — click "Retry upload" to try just those again.`,
+        );
+      } else {
+        toast.success(`${results.length} PDF${results.length === 1 ? "" : "s"} uploaded — review and create the batch below.`);
       }
+    } finally {
+      setUploadingPdfs(false);
+      setUploadBatch([]);
+      setBusy(false);
+    }
+  }
 
+  async function handleCreateBatch() {
+    if (!match || selectedMatched.length === 0) return;
+    setBusy(true);
+    try {
       const matchedRowsPayload = selectedMatched.map((m) => {
-        const u = uploaded.get(m.pdfFilename);
+        const u = uploads.get(m.pdfFilename);
         return {
           empId: m.row.empId,
           firstName: m.row.firstName,
           lastName: m.row.lastName,
           mobile: m.row.mobile,
           pdfFilename: m.pdfFilename,
-          blobUrl: u?.url,
-          blobPathname: u?.pathname,
+          blobUrl: u?.blobUrl,
+          blobPathname: u?.blobPathname,
         };
       });
 
@@ -233,7 +252,7 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        toast.error(data?.error ?? "Couldn't queue this batch — please try again.");
+        toast.error(data?.error ?? "Couldn't create this batch — please try again.");
         return;
       }
       toast.success(`${data.queued} employees queued — click "Send now" on the next page when you're ready.`);
@@ -242,7 +261,6 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
       toast.error("Network issue — check your connection and try again.");
     } finally {
       setBusy(false);
-      setUploadBatch([]);
     }
   }
 
@@ -385,8 +403,8 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                     </div>
                   </div>
                   <div className="max-h-80 overflow-y-auto rounded-md border">
-                    <Table>
-                      <TableHeader className="sticky top-0 bg-card">
+                    <Table className="table-fixed" containerClassName="overflow-visible">
+                      <TableHeader className="sticky top-0 z-10 bg-card">
                         <TableRow>
                           <TableHead className="w-8">
                             <Checkbox
@@ -395,9 +413,9 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                               aria-label="Select all"
                             />
                           </TableHead>
-                          <TableHead>Employee ID</TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Mobile</TableHead>
+                          <TableHead className="w-28">Employee ID</TableHead>
+                          <TableHead className="w-40">Name</TableHead>
+                          <TableHead className="w-32">Mobile</TableHead>
                           <TableHead>Matched PDF</TableHead>
                           <TableHead className="w-8" />
                         </TableRow>
@@ -412,12 +430,12 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                                 aria-label={`Send to ${m.row.firstName} ${m.row.lastName}`}
                               />
                             </TableCell>
-                            <TableCell className="font-medium">{m.row.empId}</TableCell>
-                            <TableCell>
+                            <TableCell className="truncate font-medium">{m.row.empId}</TableCell>
+                            <TableCell className="truncate">
                               {m.row.firstName} {m.row.lastName}
                             </TableCell>
-                            <TableCell className="text-muted-foreground">{m.row.mobile}</TableCell>
-                            <TableCell className="text-muted-foreground">
+                            <TableCell className="truncate text-muted-foreground">{m.row.mobile}</TableCell>
+                            <TableCell className="whitespace-normal break-words text-muted-foreground">
                               <span className="flex items-center gap-1.5">
                                 {uploads.get(m.pdfFilename)?.status === "done" && (
                                   <CheckCircle2 className="size-3.5 shrink-0 text-chat" />
@@ -528,22 +546,44 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
               </div>
 
               <div className="space-y-2">
-                {uploadingPdfs && uploadBatch.length > 0 && (
-                  <div className="max-w-md space-y-1.5">
-                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <Loader2 className="size-3.5 animate-spin" />
-                      Uploading PDFs… {uploadBatchDone} of {uploadBatch.length} uploaded
-                    </p>
-                    <Progress value={(uploadBatchDone / uploadBatch.length) * 100} />
+                {uploadingPdfs ? (
+                  <div
+                    className="relative inline-flex h-9 w-72 max-w-full items-center overflow-hidden rounded-lg bg-primary/20 px-2.5"
+                    role="progressbar"
+                    aria-valuenow={Math.round(uploadOverallProgress)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    <div
+                      className="absolute inset-y-0 left-0 bg-primary transition-[width] duration-200 ease-out"
+                      style={{ width: `${uploadOverallProgress}%` }}
+                    />
+                    <span className="relative z-10 flex items-center gap-1.5 text-sm font-medium text-primary-foreground">
+                      <Loader2 className="size-4 animate-spin" />
+                      Uploading… {uploadBatchDone} of {uploadBatch.length} PDFs uploaded
+                    </span>
                   </div>
+                ) : allSelectedUploaded ? (
+                  <Button onClick={handleCreateBatch} disabled={busy} size="lg">
+                    <ListPlus />
+                    {busy
+                      ? "Creating batch…"
+                      : `${selectedMatched.length} PDF${selectedMatched.length === 1 ? "" : "s"} uploaded — create batch`}
+                  </Button>
+                ) : (
+                  <Button onClick={handleUploadClick} disabled={busy || selectedMatched.length === 0} size="lg">
+                    <ListPlus />
+                    {anySelectedFailed ? "Retry upload" : `Queue ${selectedMatched.length} employees`}
+                  </Button>
                 )}
-                <Button onClick={handleConfirm} disabled={busy || selectedMatched.length === 0} size="lg">
-                  <ListPlus />
-                  {uploadingPdfs ? "Uploading…" : busy ? "Queueing…" : `Queue ${selectedMatched.length} employees`}
-                </Button>
                 <p className="text-xs text-muted-foreground">
-                  This adds them to the send queue — you&apos;ll click a separate &quot;Send now&quot; button on the
-                  next page whenever you&apos;re ready to actually notify them.
+                  {uploadingPdfs
+                    ? "Uploading the matched PDFs — this can take a moment for a large batch."
+                    : allSelectedUploaded
+                      ? "PDFs are uploaded. Creating the batch adds them to the send queue — you'll click a separate \"Send now\" button on the next page whenever you're ready to actually notify them."
+                      : anySelectedFailed
+                        ? "Some PDFs failed to upload — retry uploads just those before creating the batch."
+                        : "PDFs upload first, then you'll get a chance to create the batch."}
                 </p>
               </div>
             </CardContent>
