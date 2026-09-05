@@ -551,22 +551,22 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
               <div className="space-y-2">
                 {uploadingPdfs && (
                   <div className="w-1/2 min-w-[280px] space-y-1.5">
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1.5">
-                        <Loader2 className="size-3.5 animate-spin" />
-                        Uploading PDFs…
+                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Uploading PDFs…
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <div className="h-5 w-full overflow-hidden rounded-full border border-border bg-muted">
+                        <div
+                          className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                          style={{
+                            width: `${uploadBatch.length > 0 ? (uploadBatchDone / uploadBatch.length) * 100 : 0}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                        {uploadBatchDone}/{uploadBatch.length} files
                       </span>
-                      <span className="font-medium text-foreground">
-                        {uploadBatchDone}/{uploadBatch.length}
-                      </span>
-                    </div>
-                    <div className="h-3 w-full overflow-hidden rounded-full border border-border bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
-                        style={{
-                          width: `${uploadBatch.length > 0 ? (uploadBatchDone / uploadBatch.length) * 100 : 0}%`,
-                        }}
-                      />
                     </div>
                   </div>
                 )}
