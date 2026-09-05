@@ -3,12 +3,13 @@
 import { use, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileSpreadsheet, FolderOpen, ShieldCheck, CheckCircle2, AlertTriangle, ListPlus, Search, Eye, Users, FileX, FileWarning, PhoneOff } from "lucide-react";
+import { FileSpreadsheet, FolderOpen, ShieldCheck, CheckCircle2, AlertTriangle, ListPlus, Search, Eye, Users, FileX, FileWarning, PhoneOff, Loader2, RotateCw } from "lucide-react";
 import {
   matchEmployeesToPdfs,
   type MatchResult,
   type ParsedEmployeeRow,
 } from "@/lib/matching";
+import { uploadPdfsToBlob } from "@/lib/blobUpload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Progress } from "@/components/ui/progress";
 import { StatCard } from "@/components/stat-card";
 import { cn } from "@/lib/utils";
 import {
@@ -27,7 +29,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const MAX_BATCH_BYTES = 80 * 1024 * 1024; // headroom under the 100MB function body limit
+interface PdfUploadState {
+  status: "uploading" | "done" | "error";
+  progress: number;
+  blobUrl?: string;
+  blobPathname?: string;
+  error?: string;
+}
 
 function StepNumber({ n, done }: { n: number; done?: boolean }) {
   return (
@@ -48,6 +56,8 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
   const [label, setLabel] = useState("");
   const [rows, setRows] = useState<ParsedEmployeeRow[] | null>(null);
   const [pdfFiles, setPdfFiles] = useState<File[]>([]);
+  const [uploads, setUploads] = useState<Map<string, PdfUploadState>>(new Map());
+  const [uploadingPdfs, setUploadingPdfs] = useState(false);
   const [busy, setBusy] = useState(false);
   const [excelBusy, setExcelBusy] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
@@ -90,7 +100,46 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
   function handlePdfFiles(fileList: FileList | File[] | null | undefined) {
     const files = Array.from(fileList ?? []).filter((f) => f.name.toLowerCase().endsWith(".pdf"));
     setPdfFiles(files);
-    if (files.length > 0) toast.success(`${files.length} PDFs found`);
+    if (files.length === 0) return;
+    setUploads(new Map(files.map((f) => [f.name, { status: "uploading", progress: 0 }])));
+    runUploads(files);
+  }
+
+  async function runUploads(files: File[]) {
+    setUploadingPdfs(true);
+    try {
+      const { results, failures } = await uploadPdfsToBlob(files, clientId, (file, percentage) => {
+        setUploads((prev) => {
+          const next = new Map(prev);
+          next.set(file.name, { status: "uploading", progress: percentage });
+          return next;
+        });
+      });
+      setUploads((prev) => {
+        const next = new Map(prev);
+        for (const r of results) next.set(r.file.name, { status: "done", progress: 100, blobUrl: r.url, blobPathname: r.pathname });
+        for (const f of failures) next.set(f.file.name, { status: "error", progress: 0, error: f.error });
+        return next;
+      });
+      if (failures.length > 0) {
+        toast.error(`${failures.length} of ${files.length} PDFs failed to upload — retry them below before queueing.`);
+      } else {
+        toast.success(`${results.length} PDFs uploaded`);
+      }
+    } finally {
+      setUploadingPdfs(false);
+    }
+  }
+
+  function retryFailedUploads() {
+    const failed = pdfFiles.filter((f) => uploads.get(f.name)?.status === "error");
+    if (failed.length === 0) return;
+    setUploads((prev) => {
+      const next = new Map(prev);
+      for (const f of failed) next.set(f.name, { status: "uploading", progress: 0 });
+      return next;
+    });
+    runUploads(failed);
   }
 
   // Files already sit in browser memory, so previewing costs nothing server-side.
@@ -145,46 +194,47 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
     filteredMatched.length > 0 && filteredMatched.every((m) => selectedRows.has(m.row.rowNumber));
   const someFilteredSelected = filteredMatched.some((m) => selectedRows.has(m.row.rowNumber));
 
-  const matchedBytes = selectedMatched.reduce((sum, m) => {
-    const f = pdfFiles.find((p) => p.name === m.pdfFilename);
-    return sum + (f?.size ?? 0);
-  }, 0);
-  const overSizeLimit = matchedBytes > MAX_BATCH_BYTES;
+  const uploadedCount = pdfFiles.filter((f) => uploads.get(f.name)?.status === "done").length;
+  const failedUploads = pdfFiles.filter((f) => uploads.get(f.name)?.status === "error");
+  const selectedMissingUpload = selectedMatched.some((m) => uploads.get(m.pdfFilename)?.status !== "done");
 
   async function handleConfirm() {
     if (!match || selectedMatched.length === 0) return;
     setBusy(true);
     try {
-      const formData = new FormData();
-      formData.append("clientId", clientId);
-      if (label.trim()) formData.append("label", label.trim());
-      formData.append("unmatchedEmployeesCount", String(match.unmatchedEmployees.length));
-      formData.append("unmatchedPdfsCount", String(match.unmatchedPdfs.length));
-      formData.append(
-        "matchedRows",
-        JSON.stringify(
-          selectedMatched.map((m) => ({
-            empId: m.row.empId,
-            firstName: m.row.firstName,
-            lastName: m.row.lastName,
-            mobile: m.row.mobile,
-            pdfFilename: m.pdfFilename,
-          })),
-        ),
-      );
-      for (const m of selectedMatched) {
-        const file = pdfFiles.find((p) => p.name === m.pdfFilename);
-        if (file) formData.append("pdfs", file, file.name);
-      }
+      const matchedRowsPayload = selectedMatched.map((m) => {
+        const u = uploads.get(m.pdfFilename);
+        return {
+          empId: m.row.empId,
+          firstName: m.row.firstName,
+          lastName: m.row.lastName,
+          mobile: m.row.mobile,
+          pdfFilename: m.pdfFilename,
+          blobUrl: u?.blobUrl,
+          blobPathname: u?.blobPathname,
+        };
+      });
 
-      const res = await fetch("/api/batches", { method: "POST", body: formData });
-      const data = await res.json();
+      const res = await fetch("/api/batches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientId,
+          label: label.trim() || undefined,
+          unmatchedEmployeesCount: match.unmatchedEmployees.length,
+          unmatchedPdfsCount: match.unmatchedPdfs.length,
+          matchedRows: matchedRowsPayload,
+        }),
+      });
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        toast.error(data.error ?? "Couldn't queue this batch");
+        toast.error(data?.error ?? "Couldn't queue this batch — please try again.");
         return;
       }
       toast.success(`${data.queued} employees queued — click "Send now" on the next page when you're ready.`);
       router.push(`/dashboard/companies/${clientId}/batches/${data.batch.id}`);
+    } catch {
+      toast.error("Network issue — check your connection and try again.");
     } finally {
       setBusy(false);
     }
@@ -247,7 +297,7 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
 
         <Card className="border-none shadow-sm">
           <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-            <StepNumber n={2} done={pdfFiles.length > 0} />
+            <StepNumber n={2} done={pdfFiles.length > 0 && uploadedCount === pdfFiles.length} />
             <div>
               <CardTitle>Upload the report PDFs</CardTitle>
               <CardDescription>
@@ -284,10 +334,42 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
               />
             </label>
             {pdfFiles.length > 0 && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                <CheckCircle2 className="mr-1 inline size-3.5 text-chat" />
-                {pdfFiles.length} PDFs found
-              </p>
+              <div className="mt-3 max-w-md space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    {uploadingPdfs ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="size-3.5 text-chat" />
+                    )}
+                    {uploadingPdfs
+                      ? `Uploading… ${uploadedCount} of ${pdfFiles.length} done`
+                      : failedUploads.length > 0
+                        ? `${uploadedCount} of ${pdfFiles.length} uploaded — ${failedUploads.length} failed`
+                        : `${uploadedCount} of ${pdfFiles.length} PDFs uploaded`}
+                  </span>
+                </div>
+                <Progress value={pdfFiles.length > 0 ? (uploadedCount / pdfFiles.length) * 100 : 0} />
+                {failedUploads.length > 0 && !uploadingPdfs && (
+                  <Alert variant="destructive">
+                    <AlertTriangle />
+                    <AlertTitle>{failedUploads.length} PDF{failedUploads.length === 1 ? "" : "s"} didn&apos;t upload</AlertTitle>
+                    <AlertDescription className="space-y-2">
+                      <ul className="list-inside list-disc">
+                        {failedUploads.map((f) => (
+                          <li key={f.name}>
+                            {f.name} — {uploads.get(f.name)?.error}
+                          </li>
+                        ))}
+                      </ul>
+                      <Button type="button" variant="outline" size="sm" onClick={retryFailedUploads}>
+                        <RotateCw className="size-3.5" />
+                        Retry failed uploads
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -361,7 +443,18 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                               {m.row.firstName} {m.row.lastName}
                             </TableCell>
                             <TableCell className="text-muted-foreground">{m.row.mobile}</TableCell>
-                            <TableCell className="text-muted-foreground">{m.pdfFilename}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              <span className="flex items-center gap-1.5">
+                                {uploads.get(m.pdfFilename)?.status === "done" ? (
+                                  <CheckCircle2 className="size-3.5 shrink-0 text-chat" />
+                                ) : uploads.get(m.pdfFilename)?.status === "error" ? (
+                                  <AlertTriangle className="size-3.5 shrink-0 text-destructive" />
+                                ) : (
+                                  <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                                )}
+                                {m.pdfFilename}
+                              </span>
+                            </TableCell>
                             <TableCell>
                               <Button
                                 type="button"
@@ -393,16 +486,6 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                 </div>
               )}
 
-              {overSizeLimit && (
-                <Alert variant="destructive">
-                  <AlertTriangle />
-                  <AlertTitle>This batch is too large</AlertTitle>
-                  <AlertDescription>
-                    {(matchedBytes / 1024 / 1024).toFixed(0)}MB, over the {MAX_BATCH_BYTES / 1024 / 1024}MB limit per
-                    batch. Split this into smaller groups and queue them as separate batches.
-                  </AlertDescription>
-                </Alert>
-              )}
 
               {(match.unmatchedEmployees.length > 0 || match.invalidMobiles.length > 0) && (
                 <Accordion type="multiple" className="rounded-lg border px-3">
@@ -471,15 +554,18 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
               <div className="space-y-2">
                 <Button
                   onClick={handleConfirm}
-                  disabled={busy || selectedMatched.length === 0 || overSizeLimit}
+                  disabled={busy || selectedMatched.length === 0 || uploadingPdfs || selectedMissingUpload}
                   size="lg"
                 >
                   <ListPlus />
                   {busy ? "Queueing…" : `Queue ${selectedMatched.length} employees`}
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  This adds them to the send queue — you&apos;ll click a separate &quot;Send now&quot; button on the
-                  next page whenever you&apos;re ready to actually notify them.
+                  {uploadingPdfs
+                    ? "Waiting for PDFs to finish uploading…"
+                    : selectedMissingUpload
+                      ? "Some selected PDFs failed to upload — retry them above before queueing."
+                      : "This adds them to the send queue — you'll click a separate \"Send now\" button on the next page whenever you're ready to actually notify them."}
                 </p>
               </div>
             </CardContent>

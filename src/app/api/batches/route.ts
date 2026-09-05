@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { requireAuthorizedUserId } from "@/lib/authz";
-import { put } from "@vercel/blob";
 import { getDb } from "@/db";
 import { batches, employees, messages } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -11,6 +10,16 @@ interface MatchedRowInput {
   lastName: string;
   mobile: string;
   pdfFilename: string;
+  blobUrl: string;
+  blobPathname: string;
+}
+
+interface CreateBatchBody {
+  clientId?: string;
+  label?: string;
+  unmatchedEmployeesCount?: number;
+  unmatchedPdfsCount?: number;
+  matchedRows?: MatchedRowInput[];
 }
 
 export async function POST(request: Request) {
@@ -18,29 +27,30 @@ export async function POST(request: Request) {
   if (auth.response) return NextResponse.json({ error: auth.response.error }, { status: auth.response.status });
   const userId = auth.userId;
 
-  const formData = await request.formData();
-  const clientId = formData.get("clientId");
-  const label = formData.get("label");
-  const matchedRowsRaw = formData.get("matchedRows");
-  const unmatchedEmployeesCount = Number(formData.get("unmatchedEmployeesCount") ?? "0");
-  const unmatchedPdfsCount = Number(formData.get("unmatchedPdfsCount") ?? "0");
-
-  if (typeof clientId !== "string" || typeof matchedRowsRaw !== "string") {
-    return NextResponse.json({ error: "Missing clientId or matchedRows" }, { status: 400 });
-  }
-
-  let matchedRows: MatchedRowInput[];
+  let body: CreateBatchBody;
   try {
-    matchedRows = JSON.parse(matchedRowsRaw);
+    body = await request.json();
   } catch {
-    return NextResponse.json({ error: "matchedRows is not valid JSON" }, { status: 400 });
-  }
-  if (!Array.isArray(matchedRows) || matchedRows.length === 0) {
-    return NextResponse.json({ error: "No matched rows to queue" }, { status: 400 });
+    return NextResponse.json({ error: "That request didn't come through right — please try again." }, { status: 400 });
   }
 
-  const pdfFiles = formData.getAll("pdfs").filter((v): v is File => v instanceof File);
-  const pdfByName = new Map(pdfFiles.map((f) => [f.name, f]));
+  const { clientId, label, matchedRows, unmatchedEmployeesCount = 0, unmatchedPdfsCount = 0 } = body;
+
+  if (typeof clientId !== "string" || !Array.isArray(matchedRows) || matchedRows.length === 0) {
+    return NextResponse.json({ error: "No matched employees to queue" }, { status: 400 });
+  }
+
+  // PDFs are uploaded client-side straight to Blob storage before this runs
+  // (see /api/batches/upload), so every row must already carry its blob URL.
+  // Anything missing one means the upload step didn't finish — nothing here
+  // can recover that, so reject with a message that says what to do next.
+  const incomplete = matchedRows.find((r) => !r.blobUrl || !r.blobPathname);
+  if (incomplete) {
+    return NextResponse.json(
+      { error: `"${incomplete.pdfFilename}" hasn't finished uploading — refresh the page and try again.` },
+      { status: 400 },
+    );
+  }
 
   const db = getDb();
 
@@ -64,15 +74,8 @@ export async function POST(request: Request) {
     .returning();
 
   let queued = 0;
-  const skipped: string[] = [];
 
   for (const row of matchedRows) {
-    const pdfFile = pdfByName.get(row.pdfFilename);
-    if (!pdfFile) {
-      skipped.push(row.pdfFilename);
-      continue;
-    }
-
     const [existing] = await db
       .select()
       .from(employees)
@@ -95,15 +98,12 @@ export async function POST(request: Request) {
       });
     }
 
-    const blobPathname = `reports/${clientId}/${row.empId}-${crypto.randomUUID()}.pdf`;
-    const blob = await put(blobPathname, pdfFile, { access: "private", contentType: "application/pdf" });
-
     await db.insert(messages).values({
       id: crypto.randomUUID(),
       batchId: batch.id,
       employeeId,
-      blobPathname,
-      blobUrl: blob.url,
+      blobPathname: row.blobPathname,
+      blobUrl: row.blobUrl,
       originalFilename: row.pdfFilename,
     });
 
@@ -114,5 +114,5 @@ export async function POST(request: Request) {
   // distinct, visible steps so a non-technical admin always has an explicit
   // moment where they choose to actually notify real people — not a side
   // effect of finishing the upload wizard.
-  return NextResponse.json({ batch, queued, skipped });
+  return NextResponse.json({ batch, queued, skipped: [] });
 }
