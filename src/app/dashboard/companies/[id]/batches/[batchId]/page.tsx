@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -199,21 +200,31 @@ export default function BatchDetailPage({ params }: PageProps<"/dashboard/compan
                     </TableCell>
                     <TableCell className="align-top">
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="size-7" asChild>
-                          <a href={`/api/messages/${m.id}/preview`} target="_blank" rel="noopener noreferrer">
-                            <Eye className="size-3.5" />
-                          </a>
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="size-7" asChild>
+                              <a href={`/api/messages/${m.id}/preview`} target="_blank" rel="noopener noreferrer">
+                                <Eye className="size-3.5" />
+                              </a>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Preview message</TooltipContent>
+                        </Tooltip>
                         {m.status === "failed" && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7"
-                            disabled={retrying === m.id}
-                            onClick={() => handleRetry(m.id)}
-                          >
-                            <RotateCw className={`size-3.5 ${retrying === m.id ? "animate-spin" : ""}`} />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-7"
+                                disabled={retrying === m.id}
+                                onClick={() => handleRetry(m.id)}
+                              >
+                                <RotateCw className={`size-3.5 ${retrying === m.id ? "animate-spin" : ""}`} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Retry send</TooltipContent>
+                          </Tooltip>
                         )}
                       </div>
                     </TableCell>

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, CheckCircle2, Eye, IndianRupee, RefreshCw, Timer } from "lucide-react";
+import { BarChart3, CheckCircle2, Eye, Gauge, RefreshCw, Timer } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,6 +66,17 @@ export default function InsightsPage() {
   const maxDay = Math.max(1, ...days.map((d) => d.total));
   const deliveryRate = totals && totals.total > 0 ? Math.round((totals.delivered / totals.total) * 100) : null;
   const readRate = totals && totals.delivered > 0 ? Math.round((totals.read / totals.delivered) * 100) : null;
+  const failureRate = totals && totals.total > 0 ? (totals.failed / totals.total) * 100 : null;
+  const quality =
+    failureRate === null
+      ? { label: "—", tone: "text-muted-foreground" }
+      : failureRate <= 2
+        ? { label: "Excellent", tone: "text-emerald-600" }
+        : failureRate <= 5
+          ? { label: "Good", tone: "text-primary" }
+          : failureRate <= 10
+            ? { label: "Fair", tone: "text-amber-600" }
+            : { label: "Poor", tone: "text-destructive" };
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
@@ -135,14 +147,16 @@ export default function InsightsPage() {
               </Card>
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Spend</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Message quality</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-2 text-2xl font-semibold">
-                    <IndianRupee className="size-5 text-muted-foreground" />
-                    {totals?.totalCredit?.toFixed(2) ?? "—"}
+                  <div className={cn("flex items-center gap-2 text-2xl font-semibold", quality.tone)}>
+                    <Gauge className="size-5" />
+                    {quality.label}
                   </div>
-                  <p className="text-xs text-muted-foreground">{totals?.failed ?? 0} failed</p>
+                  <p className="text-xs text-muted-foreground">
+                    {failureRate !== null ? `${failureRate.toFixed(1)}% failed` : "no messages yet"}
+                  </p>
                 </CardContent>
               </Card>
             </div>

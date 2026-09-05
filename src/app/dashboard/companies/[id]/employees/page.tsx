@@ -6,6 +6,7 @@ import { Eye, RotateCw, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -139,22 +140,32 @@ export default function EmployeesPage({ params }: PageProps<"/dashboard/companie
                     <TableCell className="align-top">
                       <div className="flex items-center gap-1">
                         {e.message_id && (
-                          <Button variant="ghost" size="icon" className="size-7" asChild>
-                            <a href={`/api/messages/${e.message_id}/preview`} target="_blank" rel="noopener noreferrer">
-                              <Eye className="size-3.5" />
-                            </a>
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-7" asChild>
+                                <a href={`/api/messages/${e.message_id}/preview`} target="_blank" rel="noopener noreferrer">
+                                  <Eye className="size-3.5" />
+                                </a>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Preview message</TooltipContent>
+                          </Tooltip>
                         )}
                         {e.status === "failed" && e.message_id && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-7"
-                            disabled={retrying === e.message_id}
-                            onClick={() => handleRetry(e.message_id!)}
-                          >
-                            <RotateCw className={`size-3.5 ${retrying === e.message_id ? "animate-spin" : ""}`} />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-7"
+                                disabled={retrying === e.message_id}
+                                onClick={() => handleRetry(e.message_id!)}
+                              >
+                                <RotateCw className={`size-3.5 ${retrying === e.message_id ? "animate-spin" : ""}`} />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Retry send</TooltipContent>
+                          </Tooltip>
                         )}
                       </div>
                     </TableCell>

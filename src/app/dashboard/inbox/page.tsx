@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyAvatar } from "@/components/company-avatar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface Conversation {
@@ -81,18 +82,36 @@ function dayLabel(iso: string): string {
 }
 
 function MessageStatusIcon({ status }: { status: string }) {
-  switch (status) {
-    case "read":
-      return <CheckCheck className="size-3.5 text-sky-300" />;
-    case "delivered":
-      return <CheckCheck className="size-3.5 opacity-80" />;
-    case "sent":
-      return <Check className="size-3.5 opacity-80" />;
-    case "failed":
-      return <AlertCircle className="size-3.5 text-destructive" />;
-    default:
-      return <Clock className="size-3.5 opacity-70" />;
-  }
+  const icon =
+    status === "read" ? (
+      <CheckCheck className="size-3.5 text-sky-300" />
+    ) : status === "delivered" ? (
+      <CheckCheck className="size-3.5 opacity-80" />
+    ) : status === "sent" ? (
+      <Check className="size-3.5 opacity-80" />
+    ) : status === "failed" ? (
+      <AlertCircle className="size-3.5 text-destructive" />
+    ) : (
+      <Clock className="size-3.5 opacity-70" />
+    );
+  const label =
+    status === "read"
+      ? "Read"
+      : status === "delivered"
+        ? "Delivered"
+        : status === "sent"
+          ? "Sent"
+          : status === "failed"
+            ? "Failed"
+            : "Sending";
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">{icon}</span>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 export default function InboxPage() {
@@ -202,17 +221,19 @@ export default function InboxPage() {
                   key={c.counterparty_number}
                   onClick={() => selectConversation(c.counterparty_number)}
                   className={cn(
-                    "flex w-full items-center gap-3 border-b px-4 py-3 text-left transition-colors hover:bg-muted",
+                    "flex w-full items-center gap-3 border-b border-l-2 border-l-transparent px-4 py-3 text-left transition-colors hover:bg-muted",
+                    unread && "border-l-chat bg-chat/[0.06] hover:bg-chat/10",
                     selected === c.counterparty_number && "bg-muted",
                   )}
                 >
                   <CompanyAvatar name={conversationName(c)} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className={cn("truncate text-sm", unread ? "font-semibold" : "font-medium")}>
-                        {conversationName(c)}
+                      <span className={cn("flex min-w-0 items-center gap-1.5 truncate text-sm", unread ? "font-semibold text-foreground" : "font-medium text-muted-foreground")}>
+                        {unread && <span className="size-2 shrink-0 rounded-full bg-chat" />}
+                        <span className="truncate">{conversationName(c)}</span>
                       </span>
-                      <span className={cn("shrink-0 text-[11px]", unread ? "font-medium text-chat" : "text-muted-foreground")}>
+                      <span className={cn("shrink-0 text-[11px]", unread ? "font-semibold text-chat" : "text-muted-foreground")}>
                         {timeAgo(c.last_at)}
                       </span>
                     </div>
@@ -364,9 +385,18 @@ export default function InboxPage() {
                 <div className="mb-2 flex items-center gap-2 rounded-md border px-2 py-1 text-xs">
                   <Paperclip className="size-3.5" />
                   {file.name}
-                  <button onClick={() => setFile(null)} className="ml-auto text-muted-foreground hover:text-foreground">
-                    ✕
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setFile(null)}
+                        className="ml-auto text-muted-foreground hover:text-foreground"
+                        aria-label="Remove attachment"
+                      >
+                        ✕
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Remove attachment</TooltipContent>
+                  </Tooltip>
                 </div>
               )}
               <div className="flex items-end gap-2">
@@ -376,9 +406,14 @@ export default function InboxPage() {
                   className="hidden"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 />
-                <Button variant="outline" size="icon-lg" onClick={() => fileInputRef.current?.click()}>
-                  <Paperclip className="size-4" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon-lg" onClick={() => fileInputRef.current?.click()}>
+                      <Paperclip className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Attach a file</TooltipContent>
+                </Tooltip>
                 <Textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
@@ -391,14 +426,19 @@ export default function InboxPage() {
                     }
                   }}
                 />
-                <Button
-                  size="icon-lg"
-                  onClick={handleSend}
-                  disabled={sending || (!draft.trim() && !file)}
-                  className="bg-chat text-chat-foreground hover:bg-chat/90"
-                >
-                  {sending ? <Loader2 className="animate-spin" /> : <Send />}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon-lg"
+                      onClick={handleSend}
+                      disabled={sending || (!draft.trim() && !file)}
+                      className="bg-chat text-chat-foreground hover:bg-chat/90"
+                    >
+                      {sending ? <Loader2 className="animate-spin" /> : <Send />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Send message</TooltipContent>
+                </Tooltip>
               </div>
               <p className="mt-1.5 text-[11px] text-muted-foreground">
                 Replies only deliver within 24 hours of the employee&apos;s last message — WhatsApp&apos;s own rule,

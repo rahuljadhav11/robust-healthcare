@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   const status = await getAuthStatus();
@@ -35,7 +36,12 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card/60 px-4 backdrop-blur-sm">
           <div className="flex items-center gap-2">
-            <SidebarTrigger />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SidebarTrigger />
+              </TooltipTrigger>
+              <TooltipContent>Toggle sidebar</TooltipContent>
+            </Tooltip>
             <Separator orientation="vertical" className="h-4 self-center!" />
           </div>
           <UserButton

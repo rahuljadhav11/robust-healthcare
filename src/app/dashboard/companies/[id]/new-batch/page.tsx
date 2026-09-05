@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { StatCard } from "@/components/stat-card";
 import { cn } from "@/lib/utils";
 import {
@@ -441,16 +442,21 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                               </span>
                             </TableCell>
                             <TableCell>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="size-7"
-                                onClick={() => handlePreviewPdf(m.pdfFilename)}
-                                aria-label={`Preview ${m.pdfFilename}`}
-                              >
-                                <Eye className="size-3.5" />
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-7"
+                                    onClick={() => handlePreviewPdf(m.pdfFilename)}
+                                    aria-label={`Preview ${m.pdfFilename}`}
+                                  >
+                                    <Eye className="size-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Preview PDF</TooltipContent>
+                              </Tooltip>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -548,7 +554,10 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                         {uploadBatchDone}/{uploadBatch.length}
                       </span>
                     </div>
-                    <Progress value={uploadBatch.length > 0 ? (uploadBatchDone / uploadBatch.length) * 100 : 0} />
+                    <Progress
+                      value={uploadBatch.length > 0 ? (uploadBatchDone / uploadBatch.length) * 100 : 0}
+                      className="h-2.5 bg-primary/15"
+                    />
                   </div>
                 )}
                 {allSelectedUploaded ? (
