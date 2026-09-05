@@ -567,7 +567,7 @@ export default function NewBatchPage({ params }: PageProps<"/dashboard/companies
                       Uploading PDFs…
                     </p>
                     <div className="flex items-center gap-3">
-                      <div className="h-4 w-full overflow-hidden rounded-full border border-border bg-muted">
+                      <div className="h-3 w-full overflow-hidden rounded-full border border-border bg-muted">
                         <div
                           className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
                           style={{ width: `${uploadOverallProgress}%` }}
